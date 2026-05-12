@@ -707,7 +707,7 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 <div class="text-sm pt-3">
 
-**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA-like layers with full-attention: **Gemma 2** (1:1, $w$=4096), **Gemma 3** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE, 3:1 chunked-RoPE : Full-NoPE), **OLMo 3** (3:1, $w$=4096). The pure-SWA approach didn't last — frontier moved to interleaving.
+**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA-like layers with full-attention: **Gemma 2** (1:1, $w$=4096), **Gemma 3 / Gemma 4** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE, 3:1 chunked-RoPE : Full-NoPE), **OLMo 3** (3:1, $w$=4096). The pure-SWA approach didn't last — frontier moved to interleaving.
 
 </div>
 
@@ -1328,6 +1328,6 @@ class: text-center
 
 # Thanks
 
-Papers and notes: [github.com/taufeeque9/attention-improvements-talk](github.com/taufeeque9/attention-improvements-talk)
+Papers and notes: [github.com/taufeeque9/attention-improvements-talk](https://github.com/taufeeque9/attention-improvements-talk)
 
 Questions?

@@ -616,7 +616,9 @@ For 18 months: only **DeepSeek + Kimi K2** shipped it.
 
 But **QK-Norm** — the 2025 stability default — normalizes per-head $k$ before the dot product. Forces $k$ to be materialized → kills absorption.
 
-**Thawing** (late 2025 / 2026): **Mistral Large 3**, **GLM-5** (MLA + DSA). And **DeepSeek-V4** sidesteps the conflict architecturally — we'll see how.
+**Thawing** (late 2025 / 2026): **Mistral Large 3**, **GLM-5** (MLA + DSA). 
+
+**DeepSeek-V4** sidesteps the conflict architecturally — we'll see how.
 
 </v-clicks>
 
@@ -778,7 +780,7 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 <div class="flex flex-col items-center">
   <ReceptiveField :tokens="25" :layers="4" :window="2" :size="320" />
-  <div class="text-[10px] opacity-60 mt-1">Top token's reach grows ×$w$ per layer. 24 × 512 ≈ 12K effective context.</div>
+  <div class="text-[10px] opacity-60 mt-1">Receptive field at deepest layer grows ×<i>w</i> per layer. 24 × 512 ≈ 12K effective context.</div>
 </div>
 
 </div>

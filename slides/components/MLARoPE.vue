@@ -171,8 +171,6 @@ const description = computed(() => stageMeta[stage.value].desc);
           </text>
         </g>
 
-        <!-- ≡ sits dead between the two logit boxes (both centered at x=433) -->
-        <text x="433" y="88" text-anchor="middle" dominant-baseline="middle" fill="#fbbf24" class="equiv-sign">≡</text>
       </g>
 
       <!-- Stage-0-specific arrow markers (colored to match the arrow they end) -->
@@ -337,7 +335,6 @@ svg.mla-rope-svg .box-label   { font-size: 12px; font-weight: 600; }
 svg.mla-rope-svg .dim-label   { font-size: 10px; }
 svg.mla-rope-svg .mat-label   { font-size: 11px; }
 svg.mla-rope-svg .absorb-label { font-size: 11px; font-style: italic; }
-svg.mla-rope-svg .equiv-sign  { font-size: 22px; font-weight: 700; }
 
 /* Math tspans: italic for variables, baseline-shift for sub/super. */
 svg.mla-rope-svg .it  { font-style: italic; }

@@ -6,6 +6,10 @@
   RoPE on K_raw (absorption breaks). Stage 3 = decoupled fix.
   Autoplay cycles through the three stages on a slow interval; clicking a
   stage chip pins it.
+
+  All math notation is rendered via SVG <tspan> with .it / .sup / .sub
+  classes (defined in scoped CSS) — no foreignObject, no KaTeX, just
+  italic + baseline-shifted tspans so symbols read as proper math.
 */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 
@@ -66,31 +70,37 @@ const description = computed(() => stageMeta[stage.value].desc);
 
     <!-- Diagram -->
     <svg width="720" height="220" viewBox="0 0 720 220" class="mla-rope-svg rounded bg-zinc-900/30">
-      <!--
-        Three rows of pipeline, drawn at fixed coordinates and shown/hidden
-        per stage. Each row is the matmul chain producing the key vector
-        that participates in q·k.
-      -->
-
       <!-- =========== STAGE 0: no RoPE (absorption works) =========== -->
       <g v-if="isStage(0)" class="stage-group">
         <!-- Latent c -->
         <rect x="40" y="40" width="80" height="44" rx="6" fill="#34d399" fill-opacity="0.25" stroke="#34d399"/>
-        <text x="80" y="60" text-anchor="middle" class="box-label" fill="#34d399">c (latent)</text>
-        <text x="80" y="76" text-anchor="middle" class="dim-label" fill="#bbb">d_c</text>
+        <text x="80" y="60" text-anchor="middle" class="box-label" fill="#34d399">
+          <tspan class="it">c</tspan> (latent)
+        </text>
+        <text x="80" y="76" text-anchor="middle" class="dim-label" fill="#bbb">
+          <tspan class="it">d</tspan><tspan class="sub">c</tspan>
+        </text>
 
         <!-- W^{UK} -->
         <path d="M120,62 L190,62" stroke="#aaa" stroke-width="1.5" marker-end="url(#arrow-stage0)"/>
-        <text x="155" y="55" text-anchor="middle" class="mat-label" fill="#a78bfa">W^UK</text>
+        <text x="155" y="55" text-anchor="middle" class="mat-label" fill="#a78bfa">
+          <tspan class="it">W</tspan><tspan class="sup">UK</tspan>
+        </text>
 
         <!-- K_raw -->
         <rect x="200" y="40" width="80" height="44" rx="6" fill="#a78bfa" fill-opacity="0.25" stroke="#a78bfa"/>
-        <text x="240" y="60" text-anchor="middle" class="box-label" fill="#a78bfa">K_raw</text>
-        <text x="240" y="76" text-anchor="middle" class="dim-label" fill="#bbb">d_h per head</text>
+        <text x="240" y="60" text-anchor="middle" class="box-label" fill="#a78bfa">
+          <tspan class="it">K</tspan><tspan class="sub">raw</tspan>
+        </text>
+        <text x="240" y="76" text-anchor="middle" class="dim-label" fill="#bbb">
+          <tspan class="it">d</tspan><tspan class="sub">h</tspan> per head
+        </text>
 
         <!-- dot with q -->
         <path d="M280,62 L350,62" stroke="#aaa" stroke-width="1.5" marker-end="url(#arrow-stage0)"/>
-        <text x="315" y="55" text-anchor="middle" class="mat-label" fill="#60a5fa">· q</text>
+        <text x="315" y="55" text-anchor="middle" class="mat-label" fill="#60a5fa">
+          · <tspan class="it">q</tspan>
+        </text>
 
         <!-- result -->
         <rect x="360" y="40" width="100" height="44" rx="6" fill="#fbbf24" fill-opacity="0.25" stroke="#fbbf24"/>
@@ -99,31 +109,46 @@ const description = computed(() => stageMeta[stage.value].desc);
         <!-- Absorption brace beneath -->
         <path d="M120,110 Q200,140 280,110" fill="none" stroke="#34d399" stroke-width="1.5" stroke-dasharray="3 3"/>
         <text x="200" y="155" text-anchor="middle" class="absorb-label" fill="#34d399">
-          fold W^UK into q at inference → q'^⊤ · c (one matmul, d_c-dim)
+          fold <tspan class="it">W</tspan><tspan class="sup">UK</tspan> into <tspan class="it">q</tspan> at inference → <tspan class="it">q′</tspan><tspan class="sup">⊤</tspan> · <tspan class="it">c</tspan>
+          (one matmul, <tspan class="it">d</tspan><tspan class="sub">c</tspan>-dim)
         </text>
       </g>
 
       <!-- =========== STAGE 1: naive RoPE breaks absorption =========== -->
       <g v-if="isStage(1)" class="stage-group">
         <rect x="40" y="40" width="80" height="44" rx="6" fill="#34d399" fill-opacity="0.25" stroke="#34d399"/>
-        <text x="80" y="60" text-anchor="middle" class="box-label" fill="#34d399">c (latent)</text>
-        <text x="80" y="76" text-anchor="middle" class="dim-label" fill="#bbb">d_c</text>
+        <text x="80" y="60" text-anchor="middle" class="box-label" fill="#34d399">
+          <tspan class="it">c</tspan> (latent)
+        </text>
+        <text x="80" y="76" text-anchor="middle" class="dim-label" fill="#bbb">
+          <tspan class="it">d</tspan><tspan class="sub">c</tspan>
+        </text>
 
         <path d="M120,62 L180,62" stroke="#aaa" stroke-width="1.5" marker-end="url(#arrow-stage1)"/>
-        <text x="150" y="55" text-anchor="middle" class="mat-label" fill="#a78bfa">W^UK</text>
+        <text x="150" y="55" text-anchor="middle" class="mat-label" fill="#a78bfa">
+          <tspan class="it">W</tspan><tspan class="sup">UK</tspan>
+        </text>
 
         <rect x="190" y="40" width="70" height="44" rx="6" fill="#a78bfa" fill-opacity="0.25" stroke="#a78bfa"/>
-        <text x="225" y="65" text-anchor="middle" class="box-label" fill="#a78bfa">K_raw</text>
+        <text x="225" y="65" text-anchor="middle" class="box-label" fill="#a78bfa">
+          <tspan class="it">K</tspan><tspan class="sub">raw</tspan>
+        </text>
 
         <!-- R_p between W^UK·c and final K -->
         <path d="M260,62 L320,62" stroke="#f43f5e" stroke-width="2" marker-end="url(#arrow-stage1)"/>
-        <text x="290" y="55" text-anchor="middle" class="mat-label" fill="#f43f5e">R_p (RoPE)</text>
+        <text x="290" y="55" text-anchor="middle" class="mat-label" fill="#f43f5e">
+          <tspan class="it">R</tspan><tspan class="sub">p</tspan> (RoPE)
+        </text>
 
         <rect x="330" y="40" width="80" height="44" rx="6" fill="#a78bfa" fill-opacity="0.25" stroke="#a78bfa"/>
-        <text x="370" y="65" text-anchor="middle" class="box-label" fill="#a78bfa">K_rot</text>
+        <text x="370" y="65" text-anchor="middle" class="box-label" fill="#a78bfa">
+          <tspan class="it">K</tspan><tspan class="sub">rot</tspan>
+        </text>
 
         <path d="M410,62 L470,62" stroke="#aaa" stroke-width="1.5" marker-end="url(#arrow-stage1)"/>
-        <text x="440" y="55" text-anchor="middle" class="mat-label" fill="#60a5fa">· q</text>
+        <text x="440" y="55" text-anchor="middle" class="mat-label" fill="#60a5fa">
+          · <tspan class="it">q</tspan>
+        </text>
 
         <rect x="480" y="40" width="100" height="44" rx="6" fill="#fbbf24" fill-opacity="0.25" stroke="#fbbf24"/>
         <text x="530" y="65" text-anchor="middle" class="box-label" fill="#fbbf24">attention logit</text>
@@ -131,7 +156,7 @@ const description = computed(() => stageMeta[stage.value].desc);
         <!-- Red "can't fold" warning under the R block -->
         <path d="M260,110 Q295,150 330,110" fill="none" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3 3"/>
         <text x="295" y="170" text-anchor="middle" class="absorb-label" fill="#f43f5e">
-          R_p is per-token — sits between W^UK and W^Q → can't fold
+          <tspan class="it">R</tspan><tspan class="sub">p</tspan> is per-token — sits between <tspan class="it">W</tspan><tspan class="sup">UK</tspan> and <tspan class="it">W</tspan><tspan class="sup">Q</tspan> → can't fold
         </text>
         <text x="295" y="186" text-anchor="middle" class="dim-label" fill="#f43f5e">
           decompression cost returns. MLA's bandwidth win evaporates.
@@ -142,47 +167,70 @@ const description = computed(() => stageMeta[stage.value].desc);
       <g v-if="isStage(2)" class="stage-group">
         <!-- Latent c -->
         <rect x="20" y="20" width="70" height="40" rx="6" fill="#34d399" fill-opacity="0.25" stroke="#34d399"/>
-        <text x="55" y="42" text-anchor="middle" class="box-label" fill="#34d399">c (latent)</text>
+        <text x="55" y="42" text-anchor="middle" class="box-label" fill="#34d399">
+          <tspan class="it">c</tspan> (latent)
+        </text>
 
         <!-- hidden h for RoPE side channel -->
         <rect x="20" y="124" width="70" height="40" rx="6" fill="#94a3b8" fill-opacity="0.20" stroke="#94a3b8"/>
-        <text x="55" y="146" text-anchor="middle" class="box-label" fill="#94a3b8">h_t</text>
+        <text x="55" y="146" text-anchor="middle" class="box-label" fill="#94a3b8">
+          <tspan class="it">h</tspan><tspan class="sub">t</tspan>
+        </text>
 
         <!-- Content path -->
         <path d="M90,40 L160,40" stroke="#aaa" stroke-width="1.5" marker-end="url(#arrow-stage2)"/>
-        <text x="125" y="33" text-anchor="middle" class="mat-label" fill="#a78bfa">W^UK</text>
+        <text x="125" y="33" text-anchor="middle" class="mat-label" fill="#a78bfa">
+          <tspan class="it">W</tspan><tspan class="sup">UK</tspan>
+        </text>
 
         <rect x="170" y="20" width="90" height="40" rx="6" fill="#a78bfa" fill-opacity="0.25" stroke="#a78bfa"/>
-        <text x="215" y="36" text-anchor="middle" class="box-label" fill="#a78bfa">K^C (content)</text>
+        <text x="215" y="36" text-anchor="middle" class="box-label" fill="#a78bfa">
+          <tspan class="it">K</tspan><tspan class="sup">C</tspan> (content)
+        </text>
         <text x="215" y="52" text-anchor="middle" class="dim-label" fill="#bbb">absorbable</text>
 
         <!-- RoPE side path -->
         <path d="M90,144 L160,144" stroke="#aaa" stroke-width="1.5" marker-end="url(#arrow-stage2)"/>
-        <text x="125" y="135" text-anchor="middle" class="mat-label" fill="#a78bfa">W^KR</text>
+        <text x="125" y="135" text-anchor="middle" class="mat-label" fill="#a78bfa">
+          <tspan class="it">W</tspan><tspan class="sup">KR</tspan>
+        </text>
         <path d="M170,144 L210,144" stroke="#f43f5e" stroke-width="2" marker-end="url(#arrow-stage2)"/>
-        <text x="190" y="135" text-anchor="middle" class="mat-label" fill="#f43f5e">R_p</text>
+        <text x="190" y="135" text-anchor="middle" class="mat-label" fill="#f43f5e">
+          <tspan class="it">R</tspan><tspan class="sub">p</tspan>
+        </text>
 
         <rect x="220" y="124" width="90" height="40" rx="6" fill="#fb7185" fill-opacity="0.25" stroke="#fb7185"/>
-        <text x="265" y="140" text-anchor="middle" class="box-label" fill="#fb7185">K^R (rotated)</text>
-        <text x="265" y="156" text-anchor="middle" class="dim-label" fill="#bbb">d_h^R = 64, shared</text>
+        <text x="265" y="140" text-anchor="middle" class="box-label" fill="#fb7185">
+          <tspan class="it">K</tspan><tspan class="sup">R</tspan> (rotated)
+        </text>
+        <text x="265" y="156" text-anchor="middle" class="dim-label" fill="#bbb">
+          <tspan class="it">d</tspan><tspan class="sub">h</tspan><tspan class="sup">R</tspan> = 64, shared
+        </text>
 
         <!-- Concat join -->
         <path d="M260,40 C320,40 320,92 360,92" stroke="#aaa" stroke-width="1.4" fill="none" marker-end="url(#arrow-stage2)"/>
         <path d="M310,144 C340,144 340,92 360,92" stroke="#aaa" stroke-width="1.4" fill="none" marker-end="url(#arrow-stage2)"/>
 
         <rect x="370" y="72" width="80" height="40" rx="6" fill="#a78bfa" fill-opacity="0.18" stroke="#a78bfa" stroke-dasharray="3 2"/>
-        <text x="410" y="88" text-anchor="middle" class="box-label" fill="#a78bfa">K = [K^C ; K^R]</text>
+        <text x="410" y="88" text-anchor="middle" class="box-label" fill="#a78bfa">
+          <tspan class="it">K</tspan> = [<tspan class="it">K</tspan><tspan class="sup">C</tspan> ; <tspan class="it">K</tspan><tspan class="sup">R</tspan>]
+        </text>
         <text x="410" y="104" text-anchor="middle" class="dim-label" fill="#bbb">concat</text>
 
         <path d="M450,92 L520,92" stroke="#aaa" stroke-width="1.5" marker-end="url(#arrow-stage2)"/>
-        <text x="485" y="84" text-anchor="middle" class="mat-label" fill="#60a5fa">· q</text>
+        <text x="485" y="84" text-anchor="middle" class="mat-label" fill="#60a5fa">
+          · <tspan class="it">q</tspan>
+        </text>
 
         <rect x="530" y="72" width="120" height="40" rx="6" fill="#fbbf24" fill-opacity="0.25" stroke="#fbbf24"/>
-        <text x="590" y="96" text-anchor="middle" class="box-label" fill="#fbbf24">q^⊤K^C + q^⊤K^R</text>
+        <text x="590" y="96" text-anchor="middle" class="box-label" fill="#fbbf24">
+          <tspan class="it">q</tspan><tspan class="sup">⊤</tspan><tspan class="it">K</tspan><tspan class="sup">C</tspan>
+          + <tspan class="it">q</tspan><tspan class="sup">⊤</tspan><tspan class="it">K</tspan><tspan class="sup">R</tspan>
+        </text>
 
         <!-- Annotation -->
         <text x="360" y="200" text-anchor="middle" class="absorb-label" fill="#34d399">
-          C path stays absorbable (one matmul against latent) · R path is small, head-shared
+          <tspan class="it">C</tspan> path stays absorbable (one matmul against latent) · <tspan class="it">R</tspan> path is small, head-shared
         </text>
       </g>
 
@@ -208,9 +256,15 @@ const description = computed(() => stageMeta[stage.value].desc);
 svg.mla-rope-svg {
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
-svg.mla-rope-svg .box-label { font-size: 11px; font-weight: 600; }
-svg.mla-rope-svg .dim-label  { font-size: 9px; }
-svg.mla-rope-svg .mat-label  { font-size: 10px; }
+svg.mla-rope-svg .box-label   { font-size: 12px; font-weight: 600; }
+svg.mla-rope-svg .dim-label   { font-size: 10px; }
+svg.mla-rope-svg .mat-label   { font-size: 11px; }
 svg.mla-rope-svg .absorb-label { font-size: 11px; font-style: italic; }
+
+/* Math tspans: italic for variables, baseline-shift for sub/super. */
+svg.mla-rope-svg .it  { font-style: italic; }
+svg.mla-rope-svg .sup { baseline-shift: super; font-size: 75%; }
+svg.mla-rope-svg .sub { baseline-shift: sub;   font-size: 75%; }
+
 .stage-group { transition: opacity 0.3s ease; }
 </style>

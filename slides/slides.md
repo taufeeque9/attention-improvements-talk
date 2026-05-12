@@ -488,21 +488,21 @@ the conflict and the side-channel fix.
 
 <div class="grid grid-cols-[1.3fr_1fr] gap-4 items-center">
 
-<RoPESpinner :pairs="4" :max-pos="16" :tick-ms="280" :size="120" :d="64" />
+<RoPESpinner :pairs="4" :max-pos="16" :tick-ms="280" :size="120" :d="64" :max-pair-index="8" />
 
 <div class="text-sm">
 
 - Rotary Position Embedding (Su et al. 2021). **The standard positional encoding** in every model in this talk.
-- **Where:** applied to $q$ and $k$ before the dot product. *Not* applied to $v$.
-- **How:** split $q, k$ into pairs of dims; rotate pair $i$ by angle $\theta_i \cdot p$ at position $p$, with $\theta_i = 1 / 10000^{2i/d}$. *High-freq pairs spin fast, low-freq pairs barely move.*
-- **Why it works:** $(R_{p_q} q_0)^\top (R_{p_k} k_0) = q_0^\top R_{p_k - p_q} k_0$. The dot product depends only on the **relative offset**.
+- **Where:** applied to $q, k$ before the dot product. *Not* to $v$.
+- **How:** rotate each $(q, k)$ dim-pair by an angle that grows linearly with position. Different rates per pair — a spectrum from fast (revolves every few tokens) to glacially slow (one rev every ~10K tokens).
+- **Why it works:** $(R_{p_q} q)^\top (R_{p_k} k) = q^\top R_{p_k - p_q} k$ — dot product depends only on the **relative offset**.
 
 </div>
 
 </div>
 
 <div class="text-[10px] opacity-50 mt-2 text-center">
-Loop: position $p$ ticks 0 → 16 → wrap. Yellow vector = rotated; dashed ghost = unrotated reference. Pair $i$ = 0 spins fast; large $i$ spins slowly.
+Yellow = rotated $q$; dashed ghost = unrotated reference. Position $p$ loops 0 → 16. Spinners show 4 sample pairs across the fast end of the spectrum.
 </div>
 
 <!--
@@ -608,23 +608,15 @@ simpler retrofit. Open question to leave with the audience.
 
 # Why was MLA adoption so slow?
 
-For 18 months: **DeepSeek + Kimi K2 only**. No frontier lab published a "we tried MLA, it failed" ablation — Qwen, Gemma, Phi, Command A, Llama, OLMo, gpt-oss tech reports just *omit* MLA.
+For 18 months: only **DeepSeek + Kimi K2** shipped it.
 
 <v-clicks>
 
-**The structural conflict** (third-party engineering analysis — Raschka, planetbanatt, TransMLA):
+**The conflict.** MLA's speed depends on **absorption**: $W^{UK}$ folds into $W^Q$ → per-head $K$ is *never materialized*.
 
-- MLA's speed comes from **absorption**: $W^{UK}$ folds into $W^Q$ → attention is a $d_c$-dim dot product against the cached latent. **Per-head $K$ is never materialized.**
-- **QK-Norm** — the universal 2025 stability trick (Qwen 3, Gemma 3, OLMo 2, gpt-oss) — normalizes $q_i$ and $k_j$ per-head, before the dot product.
-- **They fight**: normalizing per-head $k_j$ requires materializing it → defeats absorption → MLA loses its speed advantage.
+But **QK-Norm** — the 2025 stability default — normalizes per-head $k$ before the dot product. Forces $k$ to be materialized → kills absorption.
 
-**V4 resolves this architecturally** (§2.3.3 — *Query and Key-Value Entry Normalization*):
-
-- Compressed entry $C_j^{SprsComp}$ **is** the K=V tensor (Shared-KV MQA). No $W^{UK}$ to absorb in the first place.
-- *"…RMSNorm on each head of the queries and the only head of the compressed KV entries, just before the core attention."*
-- Bonus (§2.4): V4 doesn't need Kimi K2's **QK-Clip** trick to stabilize Muon — the RMSNorm already prevents logit explosion.
-
-**Adoption thawing** (late 2025 / 2026): **Mistral Large 3** (Dec 2025, *"heavily inspired by DSV3"*) and **GLM-5** (Feb 2026, MLA + DSA) join.
+**Thawing** (late 2025 / 2026): **Mistral Large 3**, **GLM-5** (MLA + DSA). And **DeepSeek-V4** sidesteps the conflict architecturally — we'll see how.
 
 </v-clicks>
 
@@ -1279,6 +1271,7 @@ provides redundancy + complementarity.
 
 <v-clicks>
 
+- **Q/KV RMSNorm** — RMSNorm on per-head queries and on the single compressed KV entry, before the core attention. *Possible because the compressed entry is K=V — no $W^{UK}$ absorption to break.* Resolves the **MLA × QK-Norm tension** flagged earlier; also lets Muon train without QK-Clip.
 - **Partial RoPE** — only last 64 dims rotated. K=V means the output sum carries absolute position; V4 counter-rotates the output by $R(-p_i)$ to restore relative. (Not needed in standard attention where V isn't rotated.)
 - **Attention sink** — learnable $z'_h$ in the softmax denominator; per-head opt-out, total mass to KV can → 0. (Same idea shipped earlier in **GPT-OSS**, Aug 2025.)
 - **Mixed-precision KV** — BF16 for RoPE dims, FP8 for the rest (~50% smaller). **FP4** for the indexer's Q/K.

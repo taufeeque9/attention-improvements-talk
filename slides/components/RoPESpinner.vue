@@ -22,7 +22,15 @@ const props = withDefaults(defineProps<{
   base?: number;
   /** Total model dim used to compute the per-pair frequency. */
   d?: number;
-}>(), { pairs: 4, maxPos: 16, tickMs: 280, size: 110, base: 10000, d: 64 });
+  /**
+   * Largest pair index to display. RoPE's θ_i = base^(-2i/d) spans many
+   * decades; the slowest pairs (i ≈ d/2) require ~10000 positions for any
+   * visible rotation. Cap the displayed range so all spinners actually move
+   * within `maxPos` steps. Default 8 gives the slowest displayed pair
+   * roughly π/8 rad over 16 positions — clearly visible.
+   */
+  maxPairIndex?: number;
+}>(), { pairs: 4, maxPos: 16, tickMs: 280, size: 110, base: 10000, d: 64, maxPairIndex: 8 });
 
 const position = ref(0);
 let timer: number | undefined;
@@ -42,13 +50,24 @@ onBeforeUnmount(() => { if (timer !== undefined) window.clearInterval(timer); })
 */
 const pairIndices = computed(() => {
   const idx: number[] = [];
+  const maxI = Math.min(props.maxPairIndex, props.d / 2 - 1);
   for (let k = 0; k < props.pairs; k++) {
-    // Spread across i ∈ [0, d/2 - 1] on a log scale
     const frac = props.pairs === 1 ? 0 : k / (props.pairs - 1);
-    idx.push(Math.floor(frac * (props.d / 2 - 1)));
+    idx.push(Math.round(frac * maxI));
   }
   return idx;
 });
+
+// How many positions for the pair to complete one full revolution.
+function periodFor(i: number): number {
+  return (2 * Math.PI) / thetaFor(i);
+}
+function periodLabel(i: number): string {
+  const p = periodFor(i);
+  if (p < 100) return `1 rev / ~${Math.round(p)} pos`;
+  if (p < 10000) return `1 rev / ~${Math.round(p / 10) * 10} pos`;
+  return `1 rev / ~${(p / 1000).toFixed(0)}k pos`;
+}
 
 function thetaFor(i: number): number {
   return 1 / Math.pow(props.base, (2 * i) / props.d);
@@ -57,14 +76,6 @@ function thetaFor(i: number): number {
 // Angle in radians for pair i at the current position.
 function angle(i: number): number {
   return thetaFor(i) * position.value;
-}
-
-function freqLabel(i: number): string {
-  const t = thetaFor(i);
-  // Cycles per position-step
-  if (t > 0.5) return `fast (θ≈${t.toFixed(2)}/pos)`;
-  if (t > 0.05) return `mid (θ≈${t.toFixed(3)}/pos)`;
-  return `slow (θ≈${t.toExponential(1)}/pos)`;
 }
 
 const half = computed(() => props.size / 2);
@@ -100,10 +111,13 @@ const r = computed(() => props.size * 0.36);
           <!-- Arrow head -->
           <circle :cx="half + r * Math.cos(-angle(i))" :cy="half + r * Math.sin(-angle(i))" r="3" fill="#fbbf24" />
           <!-- Pair index label -->
-          <text :x="6" :y="14" class="pair-label" fill="#aaa">pair i = {{ i }}</text>
+          <text :x="6" :y="14" class="pair-label" fill="#aaa">pair <tspan class="it">i</tspan> = {{ i }}</text>
         </svg>
-        <div class="text-[10px] opacity-60">{{ freqLabel(i) }}</div>
+        <div class="text-[10px] opacity-60 tabular-nums">{{ periodLabel(i) }}</div>
       </div>
+    </div>
+    <div class="text-[10px] opacity-40 text-center">
+      Slow end continues: pair <tspan>i</tspan> = {{ Math.floor(d/2 - 1) }} would need ~{{ Math.round(periodFor(Math.floor(d/2 - 1)) / 1000) }}k positions per revolution — effectively absolute position.
     </div>
   </div>
 </template>
@@ -113,6 +127,7 @@ svg.rope-plane {
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 svg.rope-plane .pair-label {
-  font-size: 9px;
+  font-size: 10px;
 }
+svg.rope-plane .it { font-style: italic; }
 </style>

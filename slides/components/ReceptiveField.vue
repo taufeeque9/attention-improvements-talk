@@ -54,7 +54,7 @@ function reachAt(layerFromTop: number): { lo: number; hi: number } {
             ? '#60a5fa'
             : '#475569'"
           :fill-opacity="(t - 1) >= reachAt(L - 1).lo && (t - 1) <= reachAt(L - 1).hi
-            ? 0.35 + (L - 1) * 0.15
+            ? 0.35 + (layers - L) * 0.15
             : 0.15"
           rx="2"
         />

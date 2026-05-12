@@ -149,30 +149,30 @@ const description = computed(() => stageMeta[stage.value].desc);
               <stop offset="100%" stop-color="#60a5fa"/>
             </linearGradient>
           </defs>
-          <path d="M140,136 L290,136" stroke="url(#fused-q)" stroke-width="2.4" marker-end="url(#arrow-stage0-qp)"/>
-          <text x="215" y="128" text-anchor="middle" class="mat-label" fill="#a78bfa">
+          <path d="M140,136 L380,136" stroke="url(#fused-q)" stroke-width="2.4" marker-end="url(#arrow-stage0-qp)"/>
+          <text x="260" y="128" text-anchor="middle" class="mat-label" fill="#a78bfa">
             · <tspan class="it">q′</tspan>
           </text>
-          <text x="215" y="158" text-anchor="middle" class="dim-label" fill="#bbb">
+          <text x="260" y="158" text-anchor="middle" class="dim-label" fill="#bbb">
             <tspan class="it">q′</tspan> = <tspan class="it">W'</tspan><tspan class="sup">Q</tspan> <tspan class="it">h</tspan><tspan class="sub">t</tspan> ∈ ℝ<tspan class="sup"><tspan class="it">d</tspan><tspan class="sub">c</tspan></tspan>
           </text>
 
-          <!-- logit -->
-          <rect x="298" y="118" width="90" height="36" rx="6" fill="#fbbf24" fill-opacity="0.25" stroke="#fbbf24"/>
-          <text x="343" y="139" text-anchor="middle" class="box-label" fill="#fbbf24">
+          <!-- logit — same x and width as top row so the two logit boxes line up vertically -->
+          <rect x="388" y="118" width="90" height="36" rx="6" fill="#fbbf24" fill-opacity="0.25" stroke="#fbbf24"/>
+          <text x="433" y="139" text-anchor="middle" class="box-label" fill="#fbbf24">
             attn logit
           </text>
 
-          <text x="500" y="135" class="dim-label" fill="#34d399">
+          <text x="490" y="135" class="dim-label" fill="#34d399">
             <tspan class="it">d</tspan><tspan class="sub">c</tspan>-dim dot product
           </text>
-          <text x="500" y="150" class="dim-label" fill="#34d399">
+          <text x="490" y="150" class="dim-label" fill="#34d399">
             no <tspan class="it">K</tspan><tspan class="sub">raw</tspan> ever materialized
           </text>
         </g>
 
-        <!-- = sign between the two logit boxes -->
-        <text x="433" y="86" text-anchor="middle" fill="#fbbf24" class="absorb-label" font-weight="bold">≡</text>
+        <!-- ≡ sits dead between the two logit boxes (both centered at x=433) -->
+        <text x="433" y="88" text-anchor="middle" dominant-baseline="middle" fill="#fbbf24" class="equiv-sign">≡</text>
       </g>
 
       <!-- Stage-0-specific arrow markers (colored to match the arrow they end) -->
@@ -337,6 +337,7 @@ svg.mla-rope-svg .box-label   { font-size: 12px; font-weight: 600; }
 svg.mla-rope-svg .dim-label   { font-size: 10px; }
 svg.mla-rope-svg .mat-label   { font-size: 11px; }
 svg.mla-rope-svg .absorb-label { font-size: 11px; font-style: italic; }
+svg.mla-rope-svg .equiv-sign  { font-size: 22px; font-weight: 700; }
 
 /* Math tspans: italic for variables, baseline-shift for sub/super. */
 svg.mla-rope-svg .it  { font-style: italic; }

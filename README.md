@@ -2,7 +2,7 @@
 
 Slides and supporting material for a talk on post-2017 attention improvements that make long-context agentic LLMs possible.
 
-- **Slides** — Slidev deck in [slides/](slides/) ([slides.md](slides/slides.md)). See [slides/README.md](slides/README.md) for `pnpm dev` / build / PDF export.
+- **Slides** — live deck: <https://taufeeque9.github.io/attention-improvements-talk/> (all animations preserved). Source in [slides/](slides/) ([slides.md](slides/slides.md)); see [slides/README.md](slides/README.md) for `pnpm dev` / build / PDF export.
 - **Notes** — per-paper reading notes in [notes/](notes/).
 - **Papers** — local PDFs in [papers/](papers/), prefixed by talk section (`a*` KV compression, `c*` sparse attention, `e*` alternatives / hybrid SSMs).
 - **Reference** — [reference.md](reference.md): every concrete number on the slides traced to a derivation.

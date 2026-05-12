@@ -19,7 +19,7 @@ selectable: true
 Post-2017 improvements that make long-context agentic LLMs possible
 
 <div class="pt-12">
-  <span class="text-sm opacity-70">Mohammad Taufeeque</span>
+  <span class="text-xl opacity-80">Mohammad Taufeeque</span>
 </div>
 
 <!--
@@ -447,7 +447,7 @@ The math says $G = 1$ (MQA) gives the biggest intensity win — **32 FLOPs/byte*
 
 <div class="pt-4 text-amber-500 text-sm">
 
-So **production picked the second-best math** to get the first-best engineering: GQA-8 is the open-frontier default (Llama, Mistral, Qwen, Gemma, Phi, Command A — verify per-model in their tech reports).
+So **production picked the second-best math** to get the first-best engineering: small-$G$ GQA is the open-frontier default — Llama 3/4, Mistral, Qwen 2.5/3, Gemma 2/3, Phi-4, Cohere Command A (Phi-3-mini was MHA+SWA; some Qwen variants use GQA-4).
 
 </div>
 
@@ -558,7 +558,7 @@ Pareto-strict: MLA dominates MHA on **size AND quality** on hard benchmarks.
 
 <div class="pt-3 text-center text-amber-500 text-sm">
 
-📌 Yet only **DeepSeek family + Kimi K2** adopted MLA. Llama, Mistral, Qwen, Gemma, Phi, Command stayed with GQA. Implementation complexity vs the easier $G$ knob.
+📌 Yet only **DeepSeek family + Kimi K2** adopted MLA. Llama, Mistral, Qwen 2.5/3, Gemma, Phi-4, Command A stayed with GQA. Implementation complexity vs the easier $G$ knob.
 
 </div>
 
@@ -707,7 +707,7 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 <div class="text-sm pt-3">
 
-**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA-like layers with full-attention: **Gemma 2** (1:1, $w$=4096), **Gemma 3** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE, 3:1 chunked-RoPE : Full-NoPE). The pure-SWA approach didn't last — frontier moved to interleaving.
+**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA-like layers with full-attention: **Gemma 2** (1:1, $w$=4096), **Gemma 3** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE, 3:1 chunked-RoPE : Full-NoPE), **OLMo 3** (3:1, $w$=4096). The pure-SWA approach didn't last — frontier moved to interleaving.
 
 </div>
 

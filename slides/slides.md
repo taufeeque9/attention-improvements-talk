@@ -552,8 +552,8 @@ Three stages cycle every 4 s. Walk through them:
 
 (2) "Naive RoPE": apply RoPE on K_raw. Now the chain is q · R_p · W^UK · c.
     R_p depends on the position of the cached token, which is different
-    for every entry. We can't fold W^UK into q anymore — we'd have to
-    materialize K_rot per token, and we're back to MHA's bandwidth pain.
+    for every entry. We can't absorb W^UK into W^Q anymore — would need
+    one folded matrix per position. Back to MHA's bandwidth pain.
 
 (3) Fix: split. Most of K stays absorbable (no RoPE). A small extra
     channel carries position. Final attention sums two dot products.
@@ -794,7 +794,12 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 <div class="text-sm pt-3">
 
-**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA-like layers with full-attention: **Gemma 2** (1:1, $w$=4096), **Gemma 3 / Gemma 4-31B** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE, 3:1 chunked-RoPE : Full-NoPE), **OLMo 3** (3:1, $w$=4096), **GPT-OSS** (1:1, $w$=128, learned attention sinks). The pure-SWA approach didn't last — frontier moved to interleaving.
+**Frontier decoder-only LLMs**: *interleaved* SWA-like layers with periodic full-attention.
+
+- **Pure SWA** — Mistral 7B (2023, $w$=4096). Only one.
+- **1:1** — Gemma 2 ($w$=4096) · GPT-OSS ($w$=128, + learned attention sinks)
+- **3:1** — Cohere Command A (SWA-RoPE : Full-NoPE) · Llama 4 (iRoPE, chunked-RoPE : NoPE) · OLMo 3 ($w$=4096)
+- **5:1** — Gemma 3 / Gemma 4-31B ($w$=1024)
 
 </div>
 

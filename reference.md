@@ -16,7 +16,7 @@ All matmul $A \in \mathbb{R}^{m \times k}, B \in \mathbb{R}^{k \times n}$: $A B$
 | **large** | **774 M** | **36** | **20** | **1280** | **64** | **1024** |
 | XL | 1.5 B | 48 | 25 | 1600 | 64 | 1024 |
 
-**Slides use GPT-2 large.** (Verify against the GPT-2 paper / HuggingFace `transformers` config — not re-verified in chat, values from memory.)
+**Slides use GPT-2 large.** Verified against HuggingFace `openai-community/gpt2-large/config.json`: `n_layer=36`, `n_head=20`, `n_embd=1280`, `n_ctx=1024`. Params 774M per HF model card (matches Radford et al. 2019 Table 2).
 
 ---
 
@@ -45,9 +45,9 @@ Over $L = 36$ layers: $\;\;184{,}320\, n^2 \;\;\approx\; 1.84 \times 10^5 \, n^2
 
 ---
 
-## KV cache size (GPT-2 large, FP16)
+## KV cache size (GPT-2 large, BF16)
 
-Per token, per layer: $2 \,(\text{K and V}) \times H \times d_k \times 2 \text{ bytes (fp16)}$
+Per token, per layer: $2 \,(\text{K and V}) \times H \times d_k \times 2 \text{ bytes (bf16)}$
 $\;\;= 2 \times 20 \times 64 \times 2 \;=\; 5120$ B = 5 KB / token / layer.
 
 Over $L = 36$ layers: $\;5120 \times 36 \;=\; 184{,}320$ B $\;\approx\; 180$ KB **per token**.
@@ -62,12 +62,12 @@ Over $L = 36$ layers: $\;5120 \times 36 \;=\; 184{,}320$ B $\;\approx\; 180$ KB 
 
 ## Hardware reference: NVIDIA H100 SXM5
 
-(Values from NVIDIA datasheet, recalled from training — **not** re-verified in chat.)
+Verified against [NVIDIA H100 product page](https://www.nvidia.com/en-us/data-center/h100/). NVIDIA's marketing numbers are "with sparsity" (2× dense); dense figures here halve those.
 
 | Spec | Value |
 |---|---|
-| FP16 dense tensor TFLOPs | 989 TFLOPs ≈ **1 PFLOPs/s** |
-| FP8 dense tensor TFLOPs | ~1979 TFLOPs |
+| BF16 dense tensor TFLOPs | 989 TFLOPs ≈ **1 PFLOPs/s** (1979 with sparsity) — same rate as FP16 |
+| FP8 dense tensor TFLOPs | ~1979 TFLOPs (3958 with sparsity) |
 | HBM3 bandwidth | **3.35 TB/s** |
 | HBM3 capacity | **80 GB** |
 
@@ -90,7 +90,7 @@ Llama 3 70B uses GQA (8 KV heads). For both the "imagine if we used MHA" and "ac
 | $d_k$ | 128 |
 | $d$ | 8192 |
 
-### KV cache per token at $n=10^6$ (fp16)
+### KV cache per token at $n=10^6$ (bf16)
 
 | Scheme | per layer per token | total/token | at $n=10^6$ |
 |---|---|---|---|
@@ -133,9 +133,9 @@ Attention FLOPs/token factor: $32 \times 32 \times 128 = 131{,}072$ → 2.8× mo
 
 Every number on the "Concrete: GPT-2 at the agentic edge" slide and its amber callout traces to a derivation above. Spot-check before presenting:
 
-- [ ] Re-verify GPT-2 large architecture (L=36, H=20, d=1280) from the original paper or `transformers` config.
-- [ ] Re-verify Llama 3 70B / 8B architecture from the Llama 3 herd paper ([arXiv:2407.21783](https://arxiv.org/abs/2407.21783)).
-- [ ] Re-verify H100 SXM5 specs from [NVIDIA H100 datasheet](https://resources.nvidia.com/en-us-tensor-core/nvidia-tensor-core-gpu-datasheet).
+- [x] GPT-2 large architecture verified from HF `openai-community/gpt2-large/config.json` (L=36, H=20, d=1280, n_ctx=1024).
+- [x] Llama 3 70B architecture verified from Llama 3 herd paper Table 3 / Section 3.2 ([arXiv:2407.21783](https://arxiv.org/abs/2407.21783)): L=80, H=64, d=8192, num_kv_heads=8.
+- [x] H100 SXM5 specs verified from [NVIDIA H100 product page](https://www.nvidia.com/en-us/data-center/h100/): 989 TFLOPS BF16/FP16 dense (NVIDIA's page lists the same rate for both), 80 GB, 3.35 TB/s.
 - [ ] Sanity-check the 184 s prefill claim: ignoring projection FLOPs ($O(nd^2)$, dominated by attention at long context); ignoring kernel launch / softmax / mask overhead; assumes 100% HBM bandwidth utilization and 100% tensor-core utilization (both optimistic).
 - [ ] Sanity-check the 18 tok/s decode ceiling: assumes (a) the FULL KV cache is streamed per token (true for naive MHA decode), (b) we're at peak HBM bandwidth (optimistic), (c) no batching across requests.
 
@@ -145,4 +145,4 @@ Every number on the "Concrete: GPT-2 at the agentic edge" slide and its amber ca
 
 - The 2-FLOPs-per-MAC convention is standard; cited in Kaplan 2020 ("Scaling Laws for Neural Language Models") and elsewhere.
 - The attention FLOPs decomposition matches Chinchilla / FLOP-counting conventions (Hoffmann et al. 2022).
-- The KV cache size formula is standard and matches HuggingFace `model.config` × `seq_len` × 2 (K+V) × 2 bytes (fp16) calculations.
+- The KV cache size formula is standard and matches HuggingFace `model.config` × `seq_len` × 2 (K+V) × 2 bytes (bf16) calculations.

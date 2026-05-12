@@ -14,19 +14,13 @@ mdc: true
 selectable: true
 ---
 
-# Attention, after *Attention is All You Need*
+# A Decade of Improving *Attention*
 
-The post-2017 improvements that made long-context agentic LLMs possible
+Post-2017 improvements that make long-context agentic LLMs possible
 
 <div class="pt-12">
-  <span class="text-sm opacity-70">45 minutes · deep dive · audience knows the 2017 transformer</span>
+  <span class="text-xl opacity-80">Mohammad Taufeeque</span>
 </div>
-
-<!--
-Opening note to self: the goal is depth on a small number of mechanisms,
-not a tour. Three buckets: KV-cache compression, sparse attention,
-systems/kernels (time permitting).
--->
 
 ---
 
@@ -104,31 +98,19 @@ layout: section
 
 # Prefill vs. decode are *different* problems
 
-<div grid="~ cols-2 gap-8">
+<PrefillVsDecode :n="16" :size="240" />
+
+<div class="grid grid-cols-2 gap-8 pt-3 text-xs opacity-80">
 
 <div>
 
-### Prefill
-
-Process the prompt — $n$ tokens — in parallel.
-
-- Compute: $O(n^2)$ per layer (the logits matrix)
-- Memory: $O(n \cdot d)$ for activations, KV
-- **Compute-bound** on modern GPUs
-
-A 1M-token prompt is roughly $10^{12}$ attention FLOPs *per layer.*
+$O(n^2)$ compute per layer · $O(n \cdot d)$ activations · 1M-token prompt $\approx 10^{12}$ FLOPs / layer
 
 </div>
 
 <div>
 
-### Decode
-
-Generate one token at a time, autoregressively.
-
-- Compute per step: $O(n \cdot d)$
-- Memory traffic per step: re-read the entire KV cache of size $O(b \cdot H \cdot n \cdot d_k)$
-- **Memory-bandwidth-bound**
+$O(n \cdot d)$ compute per step · re-stream KV cache $O(b \cdot H \cdot n \cdot d_k)$ bytes / token
 
 </div>
 
@@ -136,8 +118,8 @@ Generate one token at a time, autoregressively.
 
 <v-click>
 
-<div class="pt-6 text-center text-amber-500 font-semibold">
-Both get worse with context length. Both have to be attacked, but with different tools.
+<div class="pt-3 text-center text-amber-500 font-semibold">
+Both get worse with context length. Each wall needs different tools.
 </div>
 
 </v-click>
@@ -162,14 +144,14 @@ What happens if we feed it a 1M-token prompt?
 | Quantity | $n = 1024$ (native) | $n = 100\text{k}$ | $n = 1\text{M}$ |
 |---|---|---|---|
 | Attention prefill FLOPs (all $L$ layers) | 193 GFLOPs | 1.8 PFLOPs | **184 PFLOPs** |
-| KV cache size (fp16) | 184 MB | 18 GB | **184 GB** |
+| KV cache size (bf16) | 184 MB | 18 GB | **184 GB** |
 | Decode bytes streamed per token | 180 KB | 18 GB | **184 GB** |
 
 </div>
 
 <v-click>
 
-On one **H100** (≈ 1 PFLOPs FP16 dense, 80 GB HBM3 @ 3.35 TB/s):
+On one **H100** (≈ 1 PFLOPs BF16 dense, 80 GB HBM3 @ 3.35 TB/s):
 
 - **Prefill attention at $n=1\text{M}$**: $\approx$ **184 s** (~3 min) of compute, attention math alone.
 - **KV cache at $n=1\text{M}$**: 184 GB — **doesn't fit on one H100.** Need 3+ GPUs just for the cache.
@@ -207,44 +189,9 @@ config / GPT-2 paper). Derivation in reference.md.
 
 ---
 
-# Why decode is bandwidth-bound — the arithmetic-intensity argument
-
-For batched incremental decode with vanilla MHA, across $n$ steps (Shazeer 2019, §2.4.1):
-
-$$
-\frac{\text{memory accesses}}{\text{arithmetic ops}} \;=\; \Theta\!\left(\frac{n}{d} + \frac{1}{b}\right)
-$$
-
-<v-clicks>
-
-- Modern HW: compute capacity ≈ **100×** memory bandwidth.
-- For the kernel to be compute-bound, this ratio must be **≪ 1**.
-- The $1/b$ term: easy — make the batch bigger.
-- The $n/d$ term: **kills you when context grows.** $n = 100\text{k}$, $d = 8192$ → ratio $\approx 12$. We're paying for memory bandwidth, not flops.
-
-</v-clicks>
-
-<v-click>
-
-<div class="pt-4 text-center text-amber-500">
-
-Where does the $n/d$ come from? The size of the cached $K, V$: $b \cdot H \cdot n \cdot d_k$. We re-load it every step.
-
-</div>
-
-</v-click>
-
-<!--
-This is the slide that justifies the entire (a) category. The n/d term IS
-the KV cache, and shrinking the KV cache is what MQA / GQA / MLA all do.
-Get the audience comfortable with this ratio - we'll come back to it.
--->
-
----
-
 # What we'll cover
 
-<div grid="~ cols-3 gap-6 pt-4">
+<div grid="~ cols-2 gap-8 pt-4">
 
 <div class="border-l-4 border-blue-400 pl-4">
 
@@ -254,7 +201,7 @@ Attacks decode bandwidth.
 
 - **MQA** — Shazeer 2019
 - **GQA** — Ainslie 2023
-- **MLA** — DeepSeek-V2 2024
+- **MLA** — DeepSeek-V2 2024 (→ V3 training)
 
 → shrink the cached K, V.
 
@@ -266,34 +213,23 @@ Attacks decode bandwidth.
 
 Attacks prefill compute.
 
-- **SWA** — Longformer / Mistral
+- **SWA** — Longformer / Mistral / Gemma / OLMo / GPT-OSS / …
 - **NSA** — DeepSeek 2025
 - **DSA** — DeepSeek-V3.2
-- **MoBA** — Kimi
 - **CSA + HCA** — DeepSeek-V4
 
 → each query reads $\ll n$ keys.
 
 </div>
 
-<div class="border-l-4 border-emerald-400 pl-4">
-
-### (d) Kernels & systems
-
-If time permits.
-
-- **FlashAttention** v1→v3
-- **PagedAttention**
-- Prefix caching
-
-→ make the dense baseline fast enough that sparse only wins at the limit.
-
-</div>
-
 </div>
 
 <div class="pt-8 text-center text-sm opacity-70">
-Then a synthesis: DeepSeek-V4 (Apr 2026) composes a token compressor + DSA-style sparse selection + sliding window + interleaved layers + MQA-core + attention sinks + mixed-precision KV. One model touches every category.
+Synthesis: <b>DeepSeek-V4</b> (Apr 2026) composes a token compressor + DSA-style sparse selection + sliding window + interleaved layers + MQA-core + attention sinks + mixed-precision KV. One model touches every category.
+</div>
+
+<div class="pt-3 text-center text-xs opacity-50">
+Out of scope (one slide at the end): FlashAttention, PagedAttention, MoBA, Ring Attention, SSM / linear hybrids.
 </div>
 
 ---
@@ -308,18 +244,15 @@ MQA → GQA → MLA
 
 # MQA → GQA: shared KV memory across heads
 
-<img src="./assets/gqa-figure2.png" class="rounded mx-auto" style="max-height: 280px;" />
+<div class="flex flex-col items-center gap-3">
 
-<v-clicks>
+<GQAExplorer :H="32" :dk="128" :initial-g="32" :interval-ms="2000" />
 
-- $H$ query heads — each asks a different question.
-- $G$ KV-head pairs — each shared across one group of $H/G$ query heads.
-- **One knob.** $G = H$ recovers MHA; $G = 1$ is MQA; in between is GQA-$G$.
-- Cached K, V shrink by factor $H / G$.
+<img src="./assets/gqa-figure2.png" class="rounded mt-1" style="max-height: 130px;" />
 
-</v-clicks>
+<div class="text-[10px] opacity-50">Ainslie et al. 2023, Figure 2.</div>
 
-<div class="text-xs opacity-50 mt-2">Ainslie et al. 2023, Figure 2. The two end points are Shazeer 2019 (MQA) and Vaswani et al. 2017 (MHA).</div>
+</div>
 
 <!--
 The whole arc of MQA → GQA on one slide. Queries keep their diversity.
@@ -330,7 +263,7 @@ the K/V projections and the cache shed dimensions. The figure makes the
 
 ---
 
-# The decode bottleneck — one generation step
+# The decode bottleneck: one generation step
 
 Cache holds $n$ tokens; generating the $(n+1)$th. Per layer, per step:
 
@@ -339,7 +272,7 @@ Cache holds $n$ tokens; generating the $(n+1)$th. Per layer, per step:
 **FLOPs:**
 $$\underbrace{8 b d^2}_{\text{4 projections}\, (Q,K,V,O)} \;+\; \underbrace{4 b n d}_{\text{attention }QK^\top \!+ AV}$$
 
-**Bytes loaded from HBM** (fp16):
+**Bytes loaded from HBM** (bf16):
 $$\underbrace{8 d^2}_{\text{weights — loaded once per step}} \;+\; \underbrace{4 b n d}_{\text{KV cache — per sequence}}$$
 
 **Arithmetic intensity** (FLOPs per byte):
@@ -394,9 +327,9 @@ For $H = 32$: MHA gives **1**, **GQA-8 gives 4** (open-frontier default), MQA gi
 
 <div class="text-sm pt-2">
 
-**Where's the cutoff?** Dense FP16 peak arithmetic intensity:
+**Where's the cutoff?** Dense BF16 peak arithmetic intensity:
 
-| GPU | Peak FP16 (dense) | HBM bandwidth | FLOPs / byte |
+| GPU | Peak BF16 (dense) | HBM bandwidth | FLOPs / byte |
 |---|---|---|---|
 | A100 (80 GB) | 312 TFLOPs | 2.0 TB/s | $\sim 156$ |
 | H100 (SXM5) | 989 TFLOPs | 3.35 TB/s | $\sim 295$ |
@@ -452,7 +385,7 @@ The math says $G = 1$ (MQA) gives the biggest intensity win — **32 FLOPs/byte*
 
 <div class="pt-4 text-amber-500 text-sm">
 
-So **production picked the second-best math** to get the first-best engineering: GQA-8 is the open-frontier default (Llama, Mistral, Qwen, Gemma, Phi, Command A — verify per-model in their tech reports).
+So **production picked the second-best math** to get the first-best engineering: small-$G$ GQA is the open-frontier default — Llama 3/4, Mistral, Qwen 2.5/3, Gemma 2/3, Phi-4, Cohere Command A (Phi-3-mini was MHA+SWA; some Qwen variants use GQA-4).
 
 </div>
 
@@ -474,17 +407,30 @@ each model's report as we hit them in the talk.
 
 # MLA: compress to a latent, not share heads
 
-<img src="./assets/mla-figure3.png" class="rounded mx-auto" style="max-height: 240px;" />
+<img src="./assets/mla-figure3.png" class="rounded mx-auto" style="max-height: 220px;" />
+
+<v-click>
+
+<div class="flex justify-center items-end gap-6 pt-3">
+  <KVBlock kind="MHA" :H="32" :dk="128" />
+  <KVBlock kind="GQA" :G="8" :H="32" :dk="128" />
+  <KVBlock kind="MQA" :H="32" :dk="128" />
+  <KVBlock kind="MLA" :dc="576" :H="32" :dk="128" label="MLA · d<sub>c</sub>+d<sub>h</sub><sup>R</sup>" />
+</div>
+
+</v-click>
 
 <v-clicks>
 
-- GQA's knob $G$ slides along the MHA ↔ MQA Pareto curve.
-- **MLA leaves the curve.** Cache a low-rank latent $c_t^{KV} \in \mathbb{R}^{d_c}$ with $d_c \ll d_h n_h$. *One* shared latent per token.
-- All $H$ query heads read the same latent — each extracts a different K, V via its own up-projection $W^{UK}_i$, $W^{UV}_i$.
+<div class="text-sm pt-1">
+
+- Cache *one* low-rank latent $c_t^{KV} \in \mathbb{R}^{d_c}$ per token. All $H$ query heads read it, each extracting its own K, V via $W^{UK}_i$, $W^{UV}_i$.
+
+</div>
 
 </v-clicks>
 
-<div class="text-xs opacity-50 mt-2">DeepSeek-AI 2024, Figure 3. The fourth panel is the new shape.</div>
+<div class="text-[10px] opacity-50 mt-1">DeepSeek-AI 2024, Figure 3. Strip below shows cached bytes/token to scale.</div>
 
 <!--
 The figure is the talk's clearest visualization that MLA is structurally
@@ -495,39 +441,143 @@ queries can each extract their own custom view of it.
 
 ---
 
-# MLA — three pieces
+# MLA: three pieces
 
 <v-clicks>
 
-**1. Low-rank joint compression** (what's cached):
+**1. Compress** — one latent, shared across heads:
 
-$$c_t^{KV} = W^{DKV} h_t, \qquad k_t^C = W^{UK} c_t^{KV}, \;\; v_t^C = W^{UV} c_t^{KV}$$
+$$c_t^{KV} = W^{DKV} h_t, \qquad c_t^{KV} \in \mathbb{R}^{d_c}, \quad d_c \ll H d_h$$
 
-DeepSeek-V2: $d_c = 4 d_h = 512$ vs MHA's $2 H d_h = 32{,}768$ raw KV elements per token. **~64× compression in element count.**
+DeepSeek-V2: $d_c + d_h^R = 576$ cached vs MHA's $2 H d_h = 32{,}768$. **~57× fewer elements.**
 
-**2. Absorption at inference** (the magic):
+**2. Per-head extract** — *not* MQA:
 
-$W^{UK}$ folds into $W^Q$; $W^{UV}$ folds into $W^O$. Per query, attention is a $d_c$-dim dot product against the cached latent. **K and V are never materialized.** No decompression cost.
+$$k_{t,i}^C = W^{UK}_i\, c_t^{KV}, \quad W^{UK}_i \in \mathbb{R}^{d_h \times d_c} \;\text{ different for each head } i$$
 
-**3. Decoupled RoPE** (the engineering scar):
+Latent is shared; **each head's projection of it is its own**. MQA would force every head to read the *same* K, V — MLA doesn't. (Same story for V via $W^{UV}_i$.)
 
-RoPE's $R_t$ matrix gets between $W^{UK}$ and the latent — breaks absorption. Fix: carry position on a tiny separate channel ($d_h^R = d_h / 2 = 64$, shared across heads), concatenated to the absorbable part.
+**3. Absorb** — at inference, never materialize the per-head $k, v$:
+
+$\tilde W^Q_i = (W^{UK}_i)^\top W^Q_i$ folds the up-projection into the query side. Attention becomes $\tilde q_{t,i}^\top c_j^{KV}$ — one $d_c$-dim dot product per cached token, per head. $W^{UV}_i$ similarly folds into $W^O$. **K and V are never reconstructed.**
 
 </v-clicks>
 
+<v-click>
+
+<div class="pt-3 text-amber-500 text-sm">
+…but <b>RoPE breaks absorption</b>. Next two slides recap RoPE and show the fix.
+</div>
+
+</v-click>
+
 <!--
-Three pieces, increasing in subtlety:
-  (1) Compression — obvious if you've seen low-rank approximation.
-  (2) Absorption — the trick that makes (1) actually pay off. Without it,
-      you save bytes but pay them back in decompression FLOPs.
-  (3) Decoupled RoPE — the kludge that shows absorption almost broke.
-The first two on this slide are the conceptual win; the third is what
-makes shipping engineers nervous about adopting MLA.
+Three pieces, ordered to build the right mental model:
+
+  (1) Compression — obvious if you've seen low-rank approximation. The
+      latent is shared across all H heads. ONE tensor per token cached.
+
+  (2) Per-head extract — the load-bearing distinction from MQA. The
+      shared latent has per-head W^UK_i slices: same latent, different
+      view per head. THIS is what gives MLA MHA-like expressivity at
+      MQA-like cost. Spend time here — it's the most common
+      misconception ("isn't MLA just MQA with a fancy name?").
+
+  (3) Absorption — the trick that makes (2) pay off at inference.
+      Without it, MLA saves bytes but pays them back in decompression
+      FLOPs every step.
+
+The "RoPE breaks absorption" line is the hook into the next two
+slides — first a 30-second RoPE refresher, then a diagram of the
+conflict and the side-channel fix.
 -->
 
 ---
 
-# MLA — smaller KV cache, *better* quality
+# RoPE in 30 seconds
+
+<div class="grid grid-cols-[1.3fr_1fr] gap-4 items-center">
+
+<RoPESpinner :pairs="4" :max-pos="16" :tick-ms="280" :size="120" :d="64" :max-pair-index="8" />
+
+<div class="text-sm">
+
+- Rotary Position Embedding (Su et al. 2021). **The standard positional encoding** in every model in this talk.
+- **Where:** applied to $q, k$ before the dot product. *Not* to $v$.
+- **How:** rotate each $(q, k)$ dim-pair by an angle that grows linearly with position. Different rates per pair — a spectrum from fast (revolves every few tokens) to glacially slow (one rev every ~10K tokens).
+- **Why it works:** $(R_{p_q} q)^\top (R_{p_k} k) = q^\top R_{p_k - p_q} k$ — dot product depends only on the **relative offset**.
+
+</div>
+
+</div>
+
+<div class="text-[10px] opacity-50 mt-2 text-center">
+Yellow = rotated $q$; dashed ghost = unrotated reference. Position $p$ loops 0 → 16. Spinners show 4 sample pairs across the fast end of the spectrum.
+</div>
+
+<!--
+The recap nobody plans for. Audience knows the *name* "RoPE" but often
+not the geometry. Spend 30 seconds:
+  - Geometry: pair-wise 2D rotations. Watch the fast / slow pairs.
+  - Algebra: the rotation matrix factors into the dot product, leaving
+    only relative position. THIS is why RoPE generalizes to longer
+    contexts than learned positional embeddings.
+  - Anatomy: applied only to q and k, only inside attention. Not
+    everywhere — that's important for the MLA conflict on the next slide.
+-->
+
+---
+
+# MLA × RoPE: why absorption almost broke
+
+<MLARoPE :interval-ms="4000" />
+
+<div class="text-sm pt-2 grid grid-cols-3 gap-3 text-xs opacity-80">
+
+<div>
+
+**No RoPE:** $W^Q$ absorbs $W^{UK}$ at inference. Per query, one matmul against the $d_c$-dim latent. Cheap.
+
+</div>
+
+<div>
+
+**Naive RoPE:** position-dependent $R_p$ sits between $W^{UK}$ and the latent. Can't pre-fold — $R_p$ is different for every token. **Decompression cost returns.**
+
+</div>
+
+<div>
+
+**Fix:** split $k$ into content $k^C = W^{UK} c$ (no RoPE, absorbable) and a tiny rotated side channel $k^R = R_p W^{KR} h$ ($d_h^R = 64$, shared across heads). Concat, then dot with $q$.
+
+</div>
+
+</div>
+
+<!--
+Three stages cycle every 4 s. Walk through them:
+
+(1) "No RoPE": absorption works. W^Q · W^UK can be precomputed; per query,
+    we dot the result with c directly. The KV cache is just c — small.
+
+(2) "Naive RoPE": apply RoPE on K_raw. Now the chain is q · R_p · W^UK · c.
+    R_p depends on the position of the cached token, which is different
+    for every entry. We can't absorb W^UK into W^Q anymore — would need
+    one folded matrix per position. Back to MHA's bandwidth pain.
+
+(3) Fix: split. Most of K stays absorbable (no RoPE). A small extra
+    channel carries position. Final attention sums two dot products.
+    The content path retains the bandwidth win; the rotated channel is
+    tiny (64 dims, shared across H heads, not H × 64) so the overhead
+    is negligible.
+
+THIS is what DeepSeek-V2 §2.1.3 calls "Decoupled RoPE." The diagram
+makes clear why it exists — and why DSA / V4 keep using the same trick.
+-->
+
+---
+
+# MLA: smaller KV cache, *better* quality
 
 <div class="text-sm">
 
@@ -549,7 +599,7 @@ Pareto-strict: MLA dominates MHA on **size AND quality** on hard benchmarks.
 
 <div class="pt-3 text-center text-amber-500 text-sm">
 
-📌 Yet only **DeepSeek family + Kimi K2** adopted MLA. Llama, Mistral, Qwen, Gemma, Phi, Command stayed with GQA. Implementation complexity vs the easier $G$ knob.
+📌 Yet adoption was slow — DeepSeek + Kimi K2 only for 18 months. Why? →
 
 </div>
 
@@ -566,59 +616,142 @@ simpler retrofit. Open question to leave with the audience.
 
 ---
 
-# The full arc — arithmetic intensity climbed from 1 to ~240
+# Why was MLA adoption so slow?
 
-<div class="text-sm pt-4">
+For 18 months: only **DeepSeek + Kimi K2** shipped it.
 
-| Variant | FLOPs / byte | Gap to H100 peak ($\sim 290$) |
-|---|---|---|
-| MHA | $1$ | $\sim 290\times$ short |
-| GQA-8 ($H = 32$) | $4$ | $\sim 70\times$ short |
-| MQA ($H = 32$) | $32$ | $\sim 9\times$ short |
-| **MLA** ($H = 128, d_c = 512$) | $\mathbf{\approx 240}$ | **within $\sim 20\%$ of peak** |
+<v-clicks>
 
+**The conflict.** MLA's speed depends on **absorption**: $W^{UK}$ folds into $W^Q$ → per-head $K$ is *never materialized*.
+
+But **QK-Norm** — the 2025 stability default — normalizes per-head $k$ before the dot product. Forces $k$ to be materialized → kills absorption.
+
+**Thawing** (late 2025 / 2026): **Mistral Large 3**, **GLM-5** (MLA + DSA). 
+
+**DeepSeek-V4** sidesteps the conflict architecturally — we'll see how.
+
+</v-clicks>
+
+<!--
+The "why didn't everyone adopt MLA?" puzzle is one of the most interesting
+questions about the post-2024 frontier-architecture landscape. There's no
+public "we tried it and failed" paper from any major lab — just silent
+omission across Qwen, Gemma, Meta, Cohere, Microsoft, OpenAI tech reports.
+
+Third-party engineering writing is what surfaces the most-cited concrete
+technical reason: MLA's absorption trick (which is what makes the cache
+small AND fast) is structurally at odds with QK-Norm, which became the
+de-facto 2025 stability trick.
+
+Mechanically: absorption means you never materialize per-head k_j; the
+cached d_c-latent IS what attention sees. QK-Norm wants RMSNorm(q_i)
+and RMSNorm(k_j) per-head — which means you have to materialize k_j.
+Once you do that, the absorption savings vanish.
+
+V4's §2.3.3 says explicitly: "the attention architecture of DeepSeek-V4
+series allows us to directly apply RMSNorm on the attention queries
+and KV entries" — the "allows us to" is the tell. V4's architecture
+differs from V2/V3 MLA in that the cached entry IS the K=V tensor
+(Shared-KV MQA on compressed entries) — no W^UK to absorb means no
+absorption-vs-norm conflict.
+
+The Muon-optimizer-without-QK-Clip detail is a nice side benefit story:
+Kimi K2 had to invent QK-Clip to use Muon at scale (the optimizer
+amplifies logit growth). V4 inherits Muon but doesn't need QK-Clip
+because RMSNorm on Q and KV already keeps logits bounded.
+
+Adoption thaw: Mistral Large 3 (Dec 2025) ships an MLA-based design
+"heavily inspired by DeepSeek-V3" per Mistral engineer commentary on HF.
+GLM-5 (Feb 2026) goes even further — MLA + DSA. Both still adopt V2/V3
+style MLA absorption, so they presumably DON'T do QK-Norm. Worth
+checking if Q&A comes up.
+
+Open question to leave: will labs that committed to QK-Norm
+(Qwen, Gemma, OLMo, OpenAI) follow V4's CSA/HCA route, or stay on
+GQA permanently? V4 is the architectural existence proof that you
+can have your KV compression and your QK-Norm too.
+-->
+
+---
+
+# The full arc: apples-to-apples at $H{=}128$
+
+<div class="text-center text-xs opacity-70 pb-1">Long-context decode limit, BF16. All four methods evaluated at $H{=}128$ (DeepSeek-V2's setting) for fair comparison. At smaller $H$, every bar scales linearly down — ordering preserved.</div>
+
+<div class="flex justify-center pt-1">
+<IntensityBars
+  :x-min="1"
+  :x-max="600"
+  :width="640"
+  :row-height="34"
+  :ridge="{ value: 290, label: 'H100 ridge ≈ 290 — compute-bound beyond' }"
+  :items="[
+    { label: 'MHA',                value: 1,   color: '#60a5fa' },
+    { label: 'GQA-8',              value: 16,  color: '#a78bfa' },
+    { label: 'MQA (hypothetical)', value: 128, color: '#f472b6' },
+    { label: 'MLA (V2)',           value: 256, color: '#34d399' },
+  ]"
+/>
 </div>
 
 <v-click>
 
-<div class="pt-6 text-center text-amber-500 font-semibold">
+<div class="text-sm pt-2">
 
-MLA closes the gap to H100 peak by $\sim 240\times$ vs vanilla MHA, *without* MQA's quality cost. The bandwidth wall — the whole motivation for compressing the KV cache — is almost closed.
+- **MHA**: intensity $\approx 1$ regardless of $H$ — every head loads its own K, V.
+- **GQA-$G$**: $H/G$. At $G{=}8$, $H{=}128$ → 16.
+- **MQA**: $H$. At $H{=}128$ → 128 — but no frontier MQA shipped at this $H$ (Ainslie 2023 found MQA training-unstable in general; tensor-parallel sharding also discourages high-$H$ MQA).
+- **MLA**: $\approx 2H = 256$ — the *same* cached latent serves both the QK and the AV dot products (one fetch, two uses). **Within ~12% of H100 peak.**
 
 </div>
 
 </v-click>
 
+<v-click>
+
+<div class="pt-2 text-center text-amber-500 font-semibold text-sm">
+MLA = MQA-128's intensity (×2), <em>without</em> giving up per-head expressivity.
+</div>
+
+</v-click>
+
 <!--
-Closing slide of the (a) section. The progression is the talk's strongest
-single visual: we walked the audience from "MHA: 1 FLOP/byte, 290× short
-of peak" all the way to "MLA: 240 FLOPs/byte, within ~20% of peak."
+Closing slide of (a), restated at apples-to-apples H=128. Formulas:
+  MHA:    intensity ≈ 1            (bytes scale with H exactly as FLOPs)
+  GQA-G:  intensity ≈ H/G
+  MQA:    intensity ≈ H            (one KV head, H queries)
+  MLA:    intensity ≈ 2H           (one latent c_KV; the SAME tensor is
+                                    read for both QK and AV — counted
+                                    twice in FLOPs but loaded once)
 
-Honest framing: ~240× intensity gain over MHA (240/1). The "first attention
-to make decode compute-bound" framing is wrong because high-H MQA gets
-similarly close; MLA's contribution is reaching it WITHOUT MQA's
-training-stability and quality penalties.
+H=128 is DeepSeek-V2's actual setting and is what makes these numbers
+reach H100's ~290 FLOPs/byte ridge. At Llama-style H=32 the bars
+become MHA=1, GQA-8=4, MQA=32, MLA=64 — same ordering, all 4× lower.
+Mention verbally if asked.
 
-The whole point of (a) on one slide. Pause here.
+The "MQA (hypothetical)" bar at 128 makes the comparison honest: MLA's
+2× gain over hypothetical-MQA-128 comes from K=V tensor-sharing through
+the latent. MQA at H=128 never shipped (training stability + tensor-
+parallel sharding issues we covered earlier). MLA gets MQA-like
+intensity at high H WITHOUT paying the stability/quality price.
 
-Transition: but we did this only by compressing the KV. The prefill wall
-(O(n^2) compute, the n×n logits matrix) is untouched. Category (c) is
-where we attack that.
+Transition: but we did this only by compressing the KV. The prefill
+wall (O(n^2) compute, n×n logits) is untouched — next slide is the
+bridge into (c).
 -->
 
 ---
 
-# V3 — training dense MLA at frontier scale
+# V3: training dense MLA at frontier scale
 
 671B / 37B-active MoE. **\$5.6M** total cost. 14.8T tokens. Open weights.
 
 <v-clicks>
 
-**Stage the context length.** Pretrain at **4K** for 14.8T tokens (where $O(n^2)$ is cheap), then YaRN-extend to **32K** then **128K** — just 1000 steps each, **only ~4% of total training cost** (Table 1).
-
-**Mixed precision.** Linear layers in **FP8** for speed and memory; **attention stays in BF16** (precision-sensitive softmax, small gradients); custom **E5M6 FP8** for the linear-after-attention activations (extra mantissa bits where the backward path needs them).
-
-**Activation checkpointing — MLA-aware.** Don't store per-head K, V activations from forward. **Recompute them from the cached latent $c^{KV}$ during backward.** One extra matmul on the way back, big activation memory saved — only cheap because MLA's up-projection is from a small latent.
+- **Staged context.** Pretrain at **4K**, then YaRN-extend to **32K** → **128K** in 1000 steps each.
+  - Context extension is **~4% of total training cost**.
+- **Mixed precision.** Linears in **FP8**; attention stays **BF16**; custom **E5M6** for the linear after attention.
+- **MLA-aware recompute.** Don't store per-head $K, V$ in forward — recompute from the cached latent $c^{KV}$ on backward. Cheap because the up-projection is from a small latent.
 
 </v-clicks>
 
@@ -626,7 +759,7 @@ where we attack that.
 
 <div class="pt-3 text-center text-amber-500 text-sm">
 
-Dense MLA scales to frontier at $5.6M because attention is *carefully bounded*: short pretraining context + precision-aware kernel choices + MLA-specific activation tricks.
+Dense MLA reaches frontier at $5.6M only — short pretraining context + precision + MLA-specific activation checkpointing.
 
 </div>
 
@@ -660,23 +793,82 @@ FLOPs/byte" architectural claim.
 -->
 
 ---
+
+# Decode wall: closed. Prefill wall: still standing.
+
+<div class="grid grid-cols-2 gap-6 pt-2">
+
+<div class="border-l-4 border-blue-400 pl-4">
+
+### ✓ (a) won decode
+
+- MLA intensity ≈ 256 — within ~12% of H100 peak.
+- KV cache ~4% of MHA at large MoE scale (Table 9).
+- Per-token streaming cost: **solved.**
+
+</div>
+
+<div class="border-l-4 border-rose-400 pl-4">
+
+### ✗ Prefill is untouched
+
+- Attention prefill is still $O(n^2)$ — every query reads every key.
+- GPT-2 large at $n{=}1$M: **184 PFLOPs / ~3 min** on one H100, attention alone.
+- $H, G, d_c$ don't change the $n^2$.
+
+</div>
+
+</div>
+
+<v-click>
+
+<div class="pt-6 text-center text-amber-500 font-semibold">
+Compression shrank the cache. <b>Sparsity</b> must shrink the work — drop the <span class="font-mono">n × n</span> logits matrix itself.
+</div>
+
+</v-click>
+
+<!--
+Bridge slide between (a) and (c). The audience should feel: we closed
+one wall but the other is still there, and it's the same n^2 from
+the GPT-2 framing slide we showed at the start.
+
+Numbers callback: 184 PFLOPs / 3 min / H100 is the exact same number
+from the framing slide — same model, same context, deliberately
+identical so the bookend is tight.
+
+Transition: now we attack the n×n logits matrix directly. Every
+method in (c) does this by choosing which keys each query reads —
+the shape zoo slide at the end of (c) is the visual payoff.
+-->
+
+---
 layout: section
 ---
 
-# (c) Sparse attention — attacking the prefill wall
+# (c) Sparse attention: attacking the prefill wall
 
-KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
+Drop $n^2$ → drop the work.
 
 ---
 
-# Sliding window attention — depth does the long-range work
+# Sliding window attention: depth does the long-range work
 
-<img src="./assets/longformer-figure2.png" class="rounded mx-auto" style="max-height: 180px;" />
+<div class="grid grid-cols-[1fr_1fr] gap-6 items-center">
+
+<img src="./assets/longformer-figure2.png" class="rounded" style="max-height: 160px;" />
+
+<div class="flex flex-col items-center">
+  <ReceptiveField :tokens="25" :layers="4" :window="2" :size="320" />
+  <div class="text-[10px] opacity-60 mt-1">Receptive field at deepest layer grows ×<i>w</i> per layer. 24 × 512 ≈ 12K effective context.</div>
+</div>
+
+</div>
 
 <v-clicks>
 
 - **SWA**: each token attends to $w$ neighbors. Compute drops from $O(n^2)$ to $O(n \cdot w)$.
-- **Receptive field grows with depth**: $\ell$ layers × window $w$ → $\ell \cdot w$ effective context. 24 layers × $w = 512$ → ~12K-token receptive field.
+- **Receptive field grows with depth**: $\ell$ layers × window $w$ → $\ell \cdot w$ effective context.
 
 </v-clicks>
 
@@ -684,7 +876,12 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 <div class="text-sm pt-3">
 
-**In frontier decoder-only LLMs**, SWA is *interleaved* with periodic full-attention layers: **Mistral 7B**, **Gemma 2/3**, **Llama 4 (iRoPE)**, **Cohere Command A**. The fully-SWA approach didn't win — frontier wants both.
+**Frontier decoder-only LLMs**: *interleaved* SWA-like layers with periodic full-attention.
+
+- **Pure SWA** — Mistral 7B (2023, $w$=4096). Only one.
+- **1:1** — Gemma 2 ($w$=4096) · GPT-OSS ($w$=128, + learned attention sinks)
+- **3:1** — Cohere Command A (SWA-RoPE : Full-NoPE) · Llama 4 (iRoPE, chunked-RoPE : NoPE) · OLMo 3 ($w$=4096)
+- **5:1** — Gemma 3 / Gemma 4-31B ($w$=1024)
 
 </div>
 
@@ -718,8 +915,34 @@ each tech report yet. Can add specifics if a Q&A asks.
 -->
 
 ---
+layout: center
+class: text-center
+---
 
-# NSA — trainable sparse attention from scratch
+## (c): switching gears
+
+# Static → *trainable* sparsity
+
+<div class="pt-4 text-base opacity-70">Don't hand-design the pattern. Let the model <em>learn</em> what each query reads.</div>
+
+<div class="pt-6 text-sm opacity-50">NSA · DSA · CSA</div>
+
+<!--
+Subsection marker between the "static sparse" arc (SWA family — Longformer,
+Mistral, Gemma 2/3, Cohere, Llama 4 iRoPE) and the "trainable sparse" arc
+(NSA, DSA, V4's CSA). Two beats:
+  (1) The fundamental shift: static = engineer picks the pattern;
+      trainable = gradients pick the pattern.
+  (2) The methods coming up share a template — a cheap scorer chooses
+      which keys each query reads, end-to-end trained.
+
+This is the intellectual core of (c) and deserves a beat of silence
+before launching into NSA's architecture.
+-->
+
+---
+
+# NSA: trainable sparse attention from scratch
 
 <img src="./assets/nsa-figure2.png" class="rounded mx-auto" style="max-height: 200px;" />
 
@@ -778,7 +1001,7 @@ Shipped: next slide — DSA in DeepSeek-V3.2 is the production refinement.
 
 ---
 
-# NSA — the math
+# NSA: the math
 
 For a query $q_t$ at position $t$ with context $k_{:t}, v_{:t}$:
 
@@ -834,7 +1057,7 @@ clustering).
 
 ---
 
-# NSA — three design choices that make it actually work
+# NSA: three design choices that make it actually work
 
 <v-clicks>
 
@@ -842,9 +1065,21 @@ clustering).
 
 $$N_t \;=\; \underbrace{\lfloor t/d \rfloor}_{\text{compression}} \;+\; \underbrace{n \cdot l'}_{\text{top-}n\text{ selection}} \;+\; \underbrace{w}_{\text{sliding}} \;\;\ll\;\; t$$
 
-Paper's hyperparameters: $l = 32$, $d = 16$, $n = 16$, $w = 512$. **At 32K context, NSA averages ~2560 active tokens / query — 8% of context** (paper §4.2). The 11.6× decode speedup at 64K (Figure 1) is the wall-clock consequence.
+Paper's hyperparameters: $l = 32$, $d = 16$, $n = 16$, $w = 512$. **At 32K context, NSA averages ~2560 active tokens / query — 8% of context** (paper §4.2). 11.6× decode speedup at 64K (Fig. 1) is the wall-clock consequence.
 
-**Top-$n$ selection is almost free.** Block importance scores come from *reusing the compression branch's attention output* (eq. 9). No separate routing computation.
+<div class="pt-2">
+<SparsityBar
+  :total="32768"
+  :parts="[
+    { label: 'compression (t/d)', value: 2048, color: '#60a5fa' },
+    { label: 'top-n selection (n·l′)', value: 2048, color: '#a78bfa' },
+    { label: 'sliding window (w)', value: 512, color: '#34d399' },
+  ]"
+  :width="620"
+/>
+</div>
+
+**Top-$n$ selection is almost free.** Block importance scores come from *reusing the compression branch's attention output* (eq. 8; eq. 9 handles the block-scheme conversion when $l' \neq l$). No separate routing computation.
 
 **Each branch has independent $K, V$ projections.** Without this, the easy-to-learn sliding-window branch's gradients dominate → compression and selection branches *starve* and never specialize. Independent projections let each branch learn its own representation.
 
@@ -912,7 +1147,7 @@ loss trajectory.
 
 ---
 
-# DSA — production trainable sparse attention (DeepSeek-V3.2)
+# DSA: production trainable sparse attention (DeepSeek-V3.2)
 
 <img src="./assets/dsa-figure2.png" class="rounded mx-auto" style="max-height: 220px;" />
 
@@ -963,7 +1198,7 @@ did separately.
 
 ---
 
-# DSA training — *continued* pretraining from a dense model
+# DSA training: *continued* pretraining from a dense model
 
 Started from **DeepSeek-V3.1-Terminus** (dense MLA, 671B / 37B-active). NOT trained from scratch.
 
@@ -1009,7 +1244,7 @@ than retraining a sparse model from scratch.
 
 ---
 
-# DSA — shipped: real wall-clock costs at scale
+# DSA shipped: real wall-clock costs at scale
 
 <img src="./assets/dsa-figure3-costs.png" class="rounded mx-auto" style="max-height: 240px;" />
 
@@ -1053,16 +1288,88 @@ and goes further.
 -->
 
 ---
+layout: center
+class: text-center
+---
 
-# DeepSeek-V4 — CSA (Compressed Sparse Attention)
+## Synthesis
+
+# DeepSeek-V4: composing every idea so far
+
+<div class="pt-4 text-base opacity-80">
+
+(a) latent query compression · MQA core · K=V tying
+
+(c) token-level compression · top-$k$ selection · sliding window · interleaved layer types
+
+</div>
+
+<div class="pt-6 text-sm opacity-50">+ mixed precision · attention sinks · partial RoPE</div>
+
+<!--
+Subsection marker before the V4 deep-dive. The audience should arrive
+here expecting V4 to be the recap-in-architecture-form of everything
+we've covered — and that's exactly what the next four slides show.
+
+Two beats on this slide:
+  (1) Acknowledge the synthesis claim explicitly: V4 = (a) + (c) +
+      production touches in one block.
+  (2) Preview the structural moves so the audience can mentally map
+      each piece to the slide that introduced it.
+-->
+
+---
+
+# DeepSeek-V4: composes (a) + (c) in one attention block
+
+<div class="text-sm pt-1">
+
+| Compression axis / piece | Came from | V4's version |
+|---|---|---|
+| Query head-dim compression | MLA (V2) | $c^Q$ down/up-projected to $n_h$ heads |
+| **KV head-dim compression** | MLA's *shared-latent + per-head $W^{UK}_i$* → **dropped**; V4 uses **MQA + K=V tied** | $C_s^\text{Comp} \in \mathbb{R}^c$ is K *and* V for every head — no $W^{UK}$, no $W^{UV}$ |
+| **KV sequence-axis compression** ($n \to n/m$) | **new in V4** | softmax-pool every $m$ tokens |
+| Top-$k$ lightning indexer | DSA (V3.2) | reused, ReLU + FP8 |
+| Sliding window for recency | SWA / Mistral / Gemma | $n_\text{win}{=}128$ uncompressed |
+| Interleaved layer types | Gemma local/global · Llama 4 iRoPE | CSA ↔ HCA |
+| Attention sink | StreamingLLM · GPT-OSS | learnable $z'_h$ |
+| Mixed-precision KV | production default | BF16 RoPE / FP8 / FP4 indexer |
+
+</div>
+
+<div class="pt-2 text-center text-amber-500 text-sm">
+V4 compresses KV on <b>two axes at once</b>: head-dim (MQA + K=V tying — <em>more</em> aggressive than MLA) <em>and</em> sequence-dim (new in V4). Every other row is a callback.
+</div>
+
+<!--
+The "everything composes" punchline as a single visual. Each row is a
+callback. Audience should be nodding by row 3.
+
+Read top to bottom while pointing:
+  - "Latent query compression — MLA's query side"
+  - "K=V sharing — new in V4, the thing that broke W^UK"
+  - "Sequence-axis compression — new in V4"
+  - "Top-k indexer — DSA"
+  - "Sliding window — Mistral/Gemma family"
+  - "Interleaved layers — Gemma local/global pattern"
+  - "Attention sink — GPT-OSS / StreamingLLM"
+  - "Mixed-precision KV — productionized everywhere now"
+
+This slide makes the "everything composes" framing explicit. The four
+V4 slides that follow fill in details for the two new-in-V4 rows.
+-->
+
+---
+
+# DeepSeek-V4: CSA (Compressed Sparse Attention)
 
 <img src="./assets/v4-figure3-csa.png" class="rounded mx-auto" style="max-height: 340px;" />
 
 <v-clicks>
 
-- **Compressor** → every $m{=}4$ tokens become 1 entry (overlapping). **Indexer + top-$k$** picks $k{=}1024$ of them
+- **Compressor** → every $m{=}4$ tokens become 1 entry (overlapping). **Indexer + top-$k$** picks $k{=}1024$ of them.
 - **Sliding window** ($n_\text{win}{=}128$ uncompressed) is concatenated, one softmax over the union.
-- **Shared-KV MQA**: each entry serves as both K *and* V. **Grouped output projection** keeps $W^O$ cheap.
+- **Shared-KV MQA**: each compressed entry serves as both K *and* V for every head — **no per-head $W^{UK}$, no $W^{UV}$**. (Contrast V2 MLA, where the shared latent had per-head slices $W^{UK}_i$. V4 drops them entirely.) **Grouped output projection** keeps the large $W^O$ cheap.
 
 </v-clicks>
 
@@ -1105,7 +1412,7 @@ c=512, d_c=1536, n_win=128, g=16, d_g=1024.
 
 ---
 
-# DeepSeek-V4 — HCA (Heavily Compressed Attention)
+# DeepSeek-V4: HCA (Heavily Compressed Attention)
 
 <img src="./assets/v4-figure4-hca.png" class="rounded mx-auto" style="max-height: 320px;" />
 
@@ -1142,30 +1449,90 @@ provides redundancy + complementarity.
 
 ---
 
-# V4 — partial RoPE, sink, mixed precision; headline cost
-
-<div class="grid grid-cols-2 gap-4">
-<div>
+# V4: the production touches
 
 <v-clicks>
 
-- **Partial RoPE** — only last 64 dims rotated. K=V means the output sum carries absolute position; V4 counter-rotates the output by $R(-p_i)$ to restore relative. (Not needed in standard attention where V isn't rotated.)
-- **Attention sink** — learnable $z'_h$ in the softmax denominator; per-head opt-out, total mass to KV can → 0.
-- **Mixed-precision KV** — BF16 for RoPE dims, FP8 for the rest (~50% smaller). **FP4** for the indexer's Q/K.
+- **Q/KV RMSNorm** — RMSNorm on per-head queries and on the single compressed KV entry, before core attention. *Possible because the entry is K=V — there's no $W^{UK}$ absorption to break.* Resolves the **MLA × QK-Norm tension** flagged earlier; also lets Muon train without QK-Clip.
+
+- **Partial RoPE** — only the last 64 dims rotated. K=V means rotating K also rotates V, so the output sum $\sum_j s_j v_j$ carries each entry's absolute position; V4 counter-rotates the output by $R(-p_i)$ to recover relative offsets. (Standard attention doesn't rotate V, so this issue never appears.)
+
+- **Attention sink** — learnable $z'_h$ in the softmax denominator; per-head opt-out, total mass to KV can → 0. (Same idea shipped earlier in **GPT-OSS**, Aug 2025.)
+
+- **Mixed-precision KV** — BF16 for the 64 RoPE dims, FP8 for the rest (~50% smaller). **FP4** for the indexer's Q/K.
 
 </v-clicks>
 
-</div>
-<div>
+<!--
+Each of these is a load-bearing engineering choice on top of the CSA/HCA
+architecture from the prior two slides.
 
-<img src="./assets/v4-figure1-cost.png" class="rounded" style="max-height: 380px;" />
+(1) Q/KV RMSNorm — recall the "MLA adoption was slow" slide: QK-Norm
+broke MLA's absorption trick because you can't normalize per-head k_j
+without materializing it. V4 dodges the conflict architecturally — by
+having no W^UK at all, there's nothing to absorb, and you're free to
+RMSNorm both ends. The "allows us to" in V4 §2.3.3 is the tell. Same
+move lets Muon train without QK-Clip (Kimi K2's earlier hack).
+
+(2) Partial RoPE — the subtle bit. Standard attention rotates only Q
+and K; V is untouched, so the output o = Σ s·v doesn't carry position.
+V4's K=V sharing breaks that — rotating K means V rotates too, so the
+output sum carries each entry's absolute p_j. Applying R(-p_i) to the
+output rotates p_j into p_j - p_i = relative. The "last 64 dims" choice
+(only a subspace lives in positional space) is inherited from MLA's
+decoupled RoPE.
+
+(3) Attention sink — from StreamingLLM (Xiao et al.). Models empirically
+reserve junk-slot tokens for excess attention mass; making the sink
+learnable and explicit removes the need for a dedicated cache token
+and stabilizes training, especially in long-context + sparse where
+"nothing relevant in my top-k" is common.
+
+(4) Mixed precision — BF16 only where positional rotation accuracy
+matters; FP8 elsewhere. FP4 indexer is bleeding-edge because the
+indexer is only used for selection, not for the value path.
+-->
+
+---
+
+# V4: headline cost at 1M context
+
+<div class="flex justify-center">
+<img src="./assets/v4-figure1-cost.png" class="rounded" style="max-height: 320px;" />
+</div>
+
+<div class="text-sm pt-3">
+
+**vs DeepSeek-V3.2** (itself MLA + DSA sparse — a frontier-sparse baseline, not a vanilla one):
+
+- V4-Pro (1.6T / 49B active): **3.7× fewer FLOPs/token** · **9.5× smaller KV cache**
+- V4-Flash (284B / 13B active): **9.8× / 13.7×**
 
 </div>
+
+<v-click>
+
+<div class="pt-2 text-sm">
+
+**vs vanilla BF16 GQA-8** (Llama/Mistral-family baseline at 1M context):
+
+- V4's KV cache is **~2% of the baseline** — ~50× smaller (V4 §2.3.4)
+
 </div>
+
+</v-click>
+
+<v-click>
+
+<div class="pt-3 text-center text-amber-500 text-sm">
+V3.2 was already sparse. V4 cuts another ~10× on top — the compounding effect of head-dim compression + sequence-axis compression + better selection.
+</div>
+
+</v-click>
 
 <!--
-Figure 1 right panel is the punchline visual. Top = single-token
-inference FLOPs vs token position at 1M context. Bottom = accumulated
+Figure 1 right panel is the punchline visual. Top: single-token
+inference FLOPs vs token position at 1M context. Bottom: accumulated
 KV cache vs sequence length. V3.2 is dashed grey (the baseline), V4-Pro
 and V4-Flash are the blue lines.
 
@@ -1173,26 +1540,68 @@ Arrows on the chart:
   - 3.7× lower FLOPs (V4-Pro vs V3.2), 9.8× lower FLOPs (V4-Flash)
   - 9.5× smaller KV (V4-Pro vs V3.2), 13.7× smaller KV (V4-Flash)
 
-Against a vanilla BF16 GQA-8 baseline at 1M context: V4's KV cache is
-~2% of that baseline (~50× smaller). V4 paper §2.3.4.
+The 50× vs GQA-8 baseline is the eye-catching number. Three effects
+compose: sequence-axis compression (m / m'), top-k selection (k), and
+mixed-precision storage (~2× from FP8 / FP4).
 
-Partial RoPE — the subtle bit. Standard attention only rotates Q and K;
-V is untouched, so the output o = Σ s·v doesn't carry position. V4's
-K=V sharing breaks that — rotating K means V is also rotated, so the
-output sum carries each entry's absolute p_j. Applying R(-p_i) to the
-output rotates p_j into p_j - p_i = relative. The "last 64 dims" choice
-(only a subspace lives in positional space) is inherited from MLA's
-decoupled RoPE.
+Open question to leave with the audience: how much of this is also
+in closed frontier models (GPT-5, Claude, Gemini)? We can't know —
+they don't publish — but V4 is the best public window into what's
+likely shared at frontier scale.
+-->
 
-Attention sink: from StreamingLLM (Xiao et al.). Models empirically
-reserve junk-slot tokens for excess attention mass; making the sink
-learnable and explicit removes the need for a dedicated cache token
-and stabilizes training, especially in long-context + sparse where
-"nothing relevant in my top-k" is common.
+---
 
-Open question: how much of this is also in closed frontier models
-(GPT-5, Claude, Gemini)? We can't know — they don't publish — but
-V4 is the best public window into what's likely shared.
+# The shape zoo: every attention pattern in one place
+
+<div class="grid grid-cols-3 gap-4 pt-2">
+
+<AttnMask preset="causal"          :n="28" :size="150" color="#94a3b8" title="Dense (GPT-2 / Gemma)" />
+<AttnMask preset="sliding-window"  :n="28" :size="150" :window="5" color="#60a5fa" title="SWA (Gemma / Mistral)" />
+<AttnMask preset="nsa-all"         :n="28" :size="150" :block="4" :picks="2" :window="3" color="#a78bfa" title="NSA — cmp ∪ slc ∪ win" />
+<AttnMask preset="dsa-topk"        :n="28" :size="150" :picks="4" color="#f472b6" title="DSA — scattered top-k" />
+<AttnMask preset="v4-csa"          :n="28" :size="150" :block="4" :picks="2" :window="3" color="#34d399" title="V4 CSA — top-k over compressed ∪ win" />
+<AttnMask preset="v4-hca"          :n="28" :size="150" :block="8" :window="3" color="#fbbf24" title="V4 HCA — dense over compressed (m′ > m)" />
+
+</div>
+
+<div class="pt-3 flex justify-center gap-5 text-xs opacity-80">
+  <span class="inline-flex items-center gap-1.5">
+    <span class="inline-block w-3 h-3 rounded-sm bg-zinc-300"></span>
+    single token read
+  </span>
+  <span class="inline-flex items-center gap-1.5">
+    <span class="inline-flex gap-0.5">
+      <span class="inline-block w-3 h-3 rounded-sm bg-zinc-300"></span>
+      <span class="inline-block w-3 h-3 rounded-sm bg-zinc-300"></span>
+      <span class="inline-block w-3 h-3 rounded-sm bg-zinc-300"></span>
+    </span>
+    uncompressed block of 𝑚 tokens read
+  </span>
+  <span class="inline-flex items-center gap-1.5">
+    <span class="inline-block w-10 h-3 rounded-sm bg-zinc-300" style="opacity:0.4"></span>
+    one compressed entry summarizing 𝑚 tokens
+  </span>
+</div>
+
+<div class="pt-2 text-center text-xs opacity-60">
+
+Row $i$ = query at position $i$, column $j$ = key it attends to. Coverage shrinks from full triangle (dense) → diagonal stripe (SWA) → handful of blocks (NSA / DSA / V4).
+
+</div>
+
+<!--
+The single visual that ties (c) together. Every method we covered chooses
+WHICH keys each query reads. The shapes are not arbitrary — they reflect
+where each method bets the signal lives:
+  - Dense: bet nothing, read everything.
+  - SWA: bet locality + depth (stacked layers → effective receptive field).
+  - NSA: bet on three scales (cmp + slc + win), gated.
+  - DSA: bet on a learned scorer's top-k.
+  - V4 CSA: bet on compressed top-k + recent window, one softmax.
+  - V4 HCA: bet on a coarse summary of everything.
+Patterns here are illustrative — actual block sizes and selection counts
+in production are larger; the relative shape is what matters.
 -->
 
 ---
@@ -1201,16 +1610,25 @@ V4 is the best public window into what's likely shared.
 
 <div class="text-sm pt-2">
 
-- **SSM / linear hybrids** — Mamba, Mamba-2, Jamba, **Nemotron-3 Super**. Replace attention rather than fix it: linear-time recurrence, constant-state. Open question: do these threads converge, or stay separate paths to long-context agentic models?
-- **Kernels** — FlashAttention v1→v3 (IO-aware tiled attention; never materialize the $n{\times}n$ matrix), PagedAttention (KV-cache as virtual memory pages). The systems layer that makes everything in this talk run.
-- **Distributed long-context** — Ring Attention (sequence-parallel attention across GPUs), rumored to underpin Gemini 1.5's 1M context.
-- **Other patterns** — MoBA (Kimi, MoE-style routing over attention blocks), StreamingLLM (attention sinks beyond V4's use).
+- **SSM / linear hybrids** — Mamba, Mamba-2, Jamba, **Nemotron-3 Super**, **Qwen 3.5** (3:1 **Gated DeltaNet** : full GQA, Feb 2026)
+  - Replace attention, don't fix it
+  - Linear-time recurrence, constant-state
+  - Open Q: do the two threads converge?
+- **Kernels & serving**
+  - FlashAttention v1→v3 — IO-aware tiling, no $n{\times}n$ matrix
+  - PagedAttention — KV cache as virtual memory pages
+- **Distributed long-context**
+  - Ring Attention — sequence-parallel attention
+  - Rumored behind Gemini 1.5's 1M context
+- **Other patterns**
+  - MoBA (Kimi) — MoE-style routing over attention blocks
+  - StreamingLLM — attention sinks
 
 </div>
 
 <div class="pt-3 text-amber-500 text-sm">
 
-Each of these is its own talk. Happy to do follow-ups.
+Each is its own talk.
 
 </div>
 
@@ -1251,6 +1669,6 @@ class: text-center
 
 # Thanks
 
-Papers and notes: [github.com/taufeeque9/attention-improvements-talk](github.com/taufeeque9/attention-improvements-talk)
+Papers and notes: [github.com/taufeeque9/attention-improvements-talk](https://github.com/taufeeque9/attention-improvements-talk)
 
 Questions?

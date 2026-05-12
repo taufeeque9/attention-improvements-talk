@@ -195,41 +195,6 @@ config / GPT-2 paper). Derivation in reference.md.
 
 ---
 
-# Why decode is bandwidth-bound — the arithmetic-intensity argument
-
-For batched incremental decode with vanilla MHA, across $n$ steps (Shazeer 2019, §2.4.1):
-
-$$
-\frac{\text{memory accesses}}{\text{arithmetic ops}} \;=\; \Theta\!\left(\frac{n}{d} + \frac{1}{b}\right)
-$$
-
-<v-clicks>
-
-- Modern HW: compute capacity ≈ **100×** memory bandwidth.
-- For the kernel to be compute-bound, this ratio must be **≪ 1**.
-- The $1/b$ term: easy — make the batch bigger.
-- The $n/d$ term: **kills you when context grows.** $n = 100\text{k}$, $d = 8192$ → ratio $\approx 12$. We're paying for memory bandwidth, not flops.
-
-</v-clicks>
-
-<v-click>
-
-<div class="pt-4 text-center text-amber-500">
-
-Where does the $n/d$ come from? The size of the cached $K, V$: $b \cdot H \cdot n \cdot d_k$. We re-load it every step.
-
-</div>
-
-</v-click>
-
-<!--
-This is the slide that justifies the entire (a) category. The n/d term IS
-the KV cache, and shrinking the KV cache is what MQA / GQA / MLA all do.
-Get the audience comfortable with this ratio - we'll come back to it.
--->
-
----
-
 # What we'll cover
 
 <div grid="~ cols-2 gap-8 pt-4">
@@ -316,7 +281,7 @@ the K/V projections and the cache shed dimensions. The figure makes the
 
 # The decode bottleneck — one generation step
 
-Cache holds $n$ tokens; generating the $(n+1)$th. Per layer, per step:
+Cache holds $n$ tokens; generating the $(n+1)$th. Per layer, per step (cf. Shazeer 2019 §2.4.1 — asymptotic $\Theta(n/d + 1/b)$):
 
 <v-clicks>
 

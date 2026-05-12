@@ -1,6 +1,6 @@
 ---
 theme: seriph
-title: Attention after Attention is All You Need
+title: A Decade of Improving Attention
 info: |
   Improvements to the attention module since 2017 that
   shipped in frontier long-context / agentic LLMs.

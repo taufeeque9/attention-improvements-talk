@@ -2,7 +2,13 @@
 /*
   AttnMask — render an n×n causal attention pattern as a small SVG heatmap.
   Each row i shows which keys j (j <= i) a query at position i attends to.
-  Filled cell = attended. Used to visually compare dense / SWA / NSA / DSA / V4.
+
+  Visual convention (shared across NSA / CSA / HCA):
+    cell  → single uncompressed token read (full opacity, per-cell gap)
+    block → m uncompressed tokens read as a block (full opacity, per-cell gap)
+    cmp   → ONE compressed entry summarizing m tokens (faint, no internal gap;
+            rendered as a single continuous bar so it visually differs from a
+            block of m discrete tokens)
 */
 
 type Preset =
@@ -12,6 +18,7 @@ type Preset =
   | 'nsa-cmp'
   | 'nsa-slc'
   | 'nsa-win'
+  | 'nsa-all'
   | 'dsa-topk'
   | 'v4-csa'
   | 'v4-hca';
@@ -21,10 +28,9 @@ const props = withDefaults(defineProps<{
   n?: number;
   size?: number;
   title?: string;
-  // Pattern-specific knobs.
-  window?: number;      // sliding-window / nsa-win
-  block?: number;       // nsa-cmp / nsa-slc / v4-csa / v4-hca
-  picks?: number;       // nsa-slc / dsa-topk / v4-csa
+  window?: number;      // sliding-window / nsa-win / nsa-all / v4-*
+  block?: number;       // nsa-cmp / nsa-slc / nsa-all / v4-csa / v4-hca
+  picks?: number;       // nsa-slc / nsa-all / dsa-topk / v4-csa
   color?: string;
   showAxes?: boolean;
 }>(), {
@@ -37,66 +43,93 @@ const props = withDefaults(defineProps<{
   showAxes: false,
 });
 
-function attended(i: number, j: number): number {
-  if (j > i) return 0;
+type Cell =
+  | { kind: 'none' }
+  | { kind: 'cell'; opacity: number }
+  | { kind: 'compressed'; opacity: number };
+
+const NONE: Cell = { kind: 'none' };
+
+function classify(i: number, j: number): Cell {
+  if (j > i) return NONE;
   switch (props.preset) {
     case 'dense':
-      return 0; // (unused; "dense" still respects causality below)
+      return NONE;
     case 'causal':
-      return 1;
+      return { kind: 'cell', opacity: 1 };
     case 'sliding-window':
-      return (i - j) < props.window ? 1 : 0;
+      return (i - j) < props.window ? { kind: 'cell', opacity: 1 } : NONE;
     case 'nsa-cmp': {
-      // Coarse: attended to compressed-block centers up to query's block.
+      // One compressed entry per source block, up to query's block.
       const qBlock = Math.floor(i / props.block);
       const kBlock = Math.floor(j / props.block);
-      // Only the first cell of each compressed block counts as "attended."
-      return kBlock <= qBlock && j % props.block === 0 ? 0.85 : 0;
+      return kBlock <= qBlock ? { kind: 'compressed', opacity: 0.5 } : NONE;
     }
     case 'nsa-slc': {
-      // Sparse: a few selected blocks (pseudo-deterministic by row).
-      const kBlock = Math.floor(j / props.block);
       const qBlock = Math.floor(i / props.block);
-      if (kBlock > qBlock) return 0;
-      // pick `picks` blocks deterministically per row
+      const kBlock = Math.floor(j / props.block);
+      if (kBlock > qBlock) return NONE;
       const seed = (i * 9301 + 49297) % 233280;
       const pickStride = Math.max(1, Math.floor((qBlock + 1) / props.picks));
-      return (kBlock % pickStride === seed % pickStride) ? 1 : 0;
+      return kBlock % pickStride === seed % pickStride
+        ? { kind: 'cell', opacity: 1 }
+        : NONE;
     }
     case 'nsa-win':
-      return (i - j) < props.window ? 1 : 0;
+      return (i - j) < props.window ? { kind: 'cell', opacity: 1 } : NONE;
+    case 'nsa-all': {
+      // win takes priority (individual recent tokens, full opacity).
+      if (i - j < props.window) return { kind: 'cell', opacity: 1 };
+      const qBlock = Math.floor(i / props.block);
+      const kBlock = Math.floor(j / props.block);
+      if (kBlock > qBlock) return NONE;
+      // slc — top-n full blocks (per-cell rendering preserves "m tokens read").
+      const seed = (i * 9301 + 49297) % 233280;
+      const pickStride = Math.max(1, Math.floor((qBlock + 1) / props.picks));
+      if (kBlock % pickStride === seed % pickStride) return { kind: 'cell', opacity: 1 };
+      // cmp — every block contributes one compressed entry.
+      return { kind: 'compressed', opacity: 0.35 };
+    }
     case 'dsa-topk': {
-      // Scattered top-k selection: pseudo-random sparse sampling.
       const x = ((i + 1) * 2654435761 ^ (j + 1) * 40503) >>> 0;
       const density = props.picks / Math.max(1, i + 1);
-      return (x % 10000) / 10000 < density ? 1 : 0;
+      return (x % 10000) / 10000 < density ? { kind: 'cell', opacity: 1 } : NONE;
     }
     case 'v4-csa': {
-      // Compressed (every `block` tokens collapse) + top-k of compressed entries.
-      const kBlock = Math.floor(j / props.block);
       const qBlock = Math.floor(i / props.block);
-      // Sliding window component (recent uncompressed)
-      if (i - j < props.window) return 1;
-      // Compressed cells (first of each block) — sparsely selected
-      if (kBlock > qBlock) return 0;
-      if (j % props.block !== 0) return 0;
-      const x = ((i + 1) * 2654435761 ^ (kBlock + 1) * 40503) >>> 0;
-      const density = props.picks / Math.max(1, qBlock + 1);
-      return (x % 10000) / 10000 < density ? 0.9 : 0;
+      const kBlock = Math.floor(j / props.block);
+      if (i - j < props.window) return { kind: 'cell', opacity: 1 };
+      if (kBlock > qBlock) return NONE;
+      const seed = ((i + 1) * 2654435761) >>> 0;
+      const pickStride = Math.max(1, Math.floor((qBlock + 1) / props.picks));
+      return kBlock % pickStride === seed % pickStride
+        ? { kind: 'compressed', opacity: 0.5 }
+        : NONE;
     }
     case 'v4-hca': {
-      // Heavily compressed (large block), dense over compressed entries.
-      const kBlock = Math.floor(j / props.block);
       const qBlock = Math.floor(i / props.block);
-      if (i - j < props.window) return 1;
-      if (kBlock > qBlock) return 0;
-      if (j % props.block !== 0) return 0;
-      return 0.7;
+      const kBlock = Math.floor(j / props.block);
+      if (i - j < props.window) return { kind: 'cell', opacity: 1 };
+      if (kBlock > qBlock) return NONE;
+      return { kind: 'compressed', opacity: 0.5 };
     }
   }
 }
 
+// Compressed bar for row i over compressed-source-block kBlock:
+// returns { opacity, span } where span is the number of source cells the bar
+// spans (clipped by causality), or null if no compressed entry there.
+function compressedBar(i: number, kBlock: number): { opacity: number; span: number } | null {
+  const j0 = kBlock * props.block;
+  if (j0 > i) return null;
+  const c = classify(i, j0);
+  if (c.kind !== 'compressed') return null;
+  const j1 = Math.min(j0 + props.block - 1, i);
+  return { opacity: c.opacity, span: j1 - j0 + 1 };
+}
+
 const cell = props.size / props.n;
+const numBlocks = Math.ceil(props.n / props.block);
 </script>
 
 <template>
@@ -110,20 +143,40 @@ const cell = props.size / props.n;
     >
       <!-- causal diagonal hint -->
       <line x1="0" y1="0" :x2="size" :y2="size" stroke="#888" stroke-width="0.4" stroke-dasharray="2 2" opacity="0.35" />
-      <g v-for="i in n" :key="`r${i}`">
-        <g v-for="j in n" :key="`c${j}`">
+
+      <!-- Pass 1: compressed-entry bars (one continuous rect per source block;
+           the inter-block gap comes from omitting the last 0.5 unit, like cells) -->
+      <g v-for="i in n" :key="`cmp-r${i}`">
+        <template v-for="kBlock in numBlocks" :key="`cmp-b${i}-${kBlock}`">
           <rect
-            v-if="attended(i - 1, j - 1) > 0"
+            v-if="compressedBar(i - 1, kBlock - 1)"
+            :x="(kBlock - 1) * props.block * cell"
+            :y="(i - 1) * cell"
+            :width="compressedBar(i - 1, kBlock - 1)!.span * cell - 0.5"
+            :height="cell - 0.5"
+            :fill="color"
+            :fill-opacity="compressedBar(i - 1, kBlock - 1)!.opacity"
+            rx="0.5"
+          />
+        </template>
+      </g>
+
+      <!-- Pass 2: individual-token cells (drawn on top of any cmp bar) -->
+      <g v-for="i in n" :key="`r${i}`">
+        <template v-for="j in n" :key="`c${i}-${j}`">
+          <rect
+            v-if="classify(i - 1, j - 1).kind === 'cell'"
             :x="(j - 1) * cell"
             :y="(i - 1) * cell"
             :width="cell - 0.5"
             :height="cell - 0.5"
             :fill="color"
-            :fill-opacity="attended(i - 1, j - 1)"
+            :fill-opacity="(classify(i - 1, j - 1) as { kind: 'cell'; opacity: number }).opacity"
             rx="0.5"
           />
-        </g>
+        </template>
       </g>
+
       <text
         v-if="showAxes"
         :x="size / 2"

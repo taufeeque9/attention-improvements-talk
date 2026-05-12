@@ -589,7 +589,7 @@ Pareto-strict: MLA dominates MHA on **size AND quality** on hard benchmarks.
 
 <div class="pt-3 text-center text-amber-500 text-sm">
 
-📌 Slow adoption: **DeepSeek family + Kimi K2** for 18 months, then **Mistral Large 3** (Dec 2025) and **GLM-5** (Feb 2026, MLA + DSA) joined. Llama, Qwen 2.5/3, Gemma, Phi-4, Command A, OLMo, GPT-OSS still on GQA. The most-cited barrier: **MLA is incompatible with QK-Norm**, which has become the default training-stability trick.
+📌 Yet adoption was slow — DeepSeek + Kimi K2 only for 18 months. Why? →
 
 </div>
 
@@ -606,20 +606,84 @@ simpler retrofit. Open question to leave with the audience.
 
 ---
 
+# Why was MLA adoption so slow?
+
+For 18 months: **DeepSeek + Kimi K2 only**. No frontier lab published a "we tried MLA, it failed" ablation — Qwen, Gemma, Phi, Command A, Llama, OLMo, gpt-oss tech reports just *omit* MLA.
+
+<v-clicks>
+
+**The structural conflict** (third-party engineering analysis — Raschka, planetbanatt, TransMLA):
+
+- MLA's speed comes from **absorption**: $W^{UK}$ folds into $W^Q$ → attention is a $d_c$-dim dot product against the cached latent. **Per-head $K$ is never materialized.**
+- **QK-Norm** — the universal 2025 stability trick (Qwen 3, Gemma 3, OLMo 2, gpt-oss) — normalizes $q_i$ and $k_j$ per-head, before the dot product.
+- **They fight**: normalizing per-head $k_j$ requires materializing it → defeats absorption → MLA loses its speed advantage.
+
+**V4 resolves this architecturally** (§2.3.3 — *Query and Key-Value Entry Normalization*):
+
+- Compressed entry $C_j^{SprsComp}$ **is** the K=V tensor (Shared-KV MQA). No $W^{UK}$ to absorb in the first place.
+- *"…RMSNorm on each head of the queries and the only head of the compressed KV entries, just before the core attention."*
+- Bonus (§2.4): V4 doesn't need Kimi K2's **QK-Clip** trick to stabilize Muon — the RMSNorm already prevents logit explosion.
+
+**Adoption thawing** (late 2025 / 2026): **Mistral Large 3** (Dec 2025, *"heavily inspired by DSV3"*) and **GLM-5** (Feb 2026, MLA + DSA) join.
+
+</v-clicks>
+
+<!--
+The "why didn't everyone adopt MLA?" puzzle is one of the most interesting
+questions about the post-2024 frontier-architecture landscape. There's no
+public "we tried it and failed" paper from any major lab — just silent
+omission across Qwen, Gemma, Meta, Cohere, Microsoft, OpenAI tech reports.
+
+Third-party engineering writing is what surfaces the most-cited concrete
+technical reason: MLA's absorption trick (which is what makes the cache
+small AND fast) is structurally at odds with QK-Norm, which became the
+de-facto 2025 stability trick.
+
+Mechanically: absorption means you never materialize per-head k_j; the
+cached d_c-latent IS what attention sees. QK-Norm wants RMSNorm(q_i)
+and RMSNorm(k_j) per-head — which means you have to materialize k_j.
+Once you do that, the absorption savings vanish.
+
+V4's §2.3.3 says explicitly: "the attention architecture of DeepSeek-V4
+series allows us to directly apply RMSNorm on the attention queries
+and KV entries" — the "allows us to" is the tell. V4's architecture
+differs from V2/V3 MLA in that the cached entry IS the K=V tensor
+(Shared-KV MQA on compressed entries) — no W^UK to absorb means no
+absorption-vs-norm conflict.
+
+The Muon-optimizer-without-QK-Clip detail is a nice side benefit story:
+Kimi K2 had to invent QK-Clip to use Muon at scale (the optimizer
+amplifies logit growth). V4 inherits Muon but doesn't need QK-Clip
+because RMSNorm on Q and KV already keeps logits bounded.
+
+Adoption thaw: Mistral Large 3 (Dec 2025) ships an MLA-based design
+"heavily inspired by DeepSeek-V3" per Mistral engineer commentary on HF.
+GLM-5 (Feb 2026) goes even further — MLA + DSA. Both still adopt V2/V3
+style MLA absorption, so they presumably DON'T do QK-Norm. Worth
+checking if Q&A comes up.
+
+Open question to leave: will labs that committed to QK-Norm
+(Qwen, Gemma, OLMo, OpenAI) follow V4's CSA/HCA route, or stay on
+GQA permanently? V4 is the architectural existence proof that you
+can have your KV compression and your QK-Norm too.
+-->
+
+---
+
 # The full arc — arithmetic intensity climbed from 1 to ~240
 
 <div class="flex justify-center pt-2">
-<Roofline
-  :peak="290"
-  :x-min="0.5"
+<IntensityBars
+  :x-min="1"
   :x-max="600"
   :width="640"
-  :height="300"
-  :markers="[
-    { x: 1,   label: 'MHA',     color: '#60a5fa' },
-    { x: 4,   label: 'GQA-8',   color: '#a78bfa' },
-    { x: 32,  label: 'MQA',     color: '#f472b6' },
-    { x: 240, label: 'MLA',     color: '#34d399' },
+  :row-height="34"
+  :ridge="{ value: 290, label: 'H100 ridge ≈ 290 — compute-bound beyond' }"
+  :items="[
+    { label: 'MHA',   value: 1,   color: '#60a5fa' },
+    { label: 'GQA-8', value: 4,   color: '#a78bfa' },
+    { label: 'MQA',   value: 32,  color: '#f472b6' },
+    { label: 'MLA',   value: 240, color: '#34d399' },
   ]"
 />
 </div>

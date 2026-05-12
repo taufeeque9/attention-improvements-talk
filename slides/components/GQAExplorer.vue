@@ -118,33 +118,43 @@ function groupColor(g: number, total: number): string {
       <span v-else class="ml-2 text-[10px] opacity-50">▸ autoplay every {{ (intervalMs / 1000).toFixed(0) }}s</span>
     </div>
 
-    <!-- Query heads row -->
-    <div>
-      <div class="text-[10px] opacity-60 mb-1">H = {{ H }} query heads (each asks a different question)</div>
-      <div class="flex gap-[2px] flex-wrap" style="max-width: 720px;">
-        <div
-          v-for="qh in queryHeads"
-          :key="`q${qh.id}`"
-          class="w-4 h-5 rounded-sm transition-colors duration-300"
-          :style="{ background: groupColor(qh.group, G) }"
-          :title="`query head ${qh.id} → KV group ${qh.group}`"
-        />
+    <!-- Query heads + KV heads on a shared H-column grid so the two rows align.
+         Each KV head spans H/G columns and is centered within that span, so
+         it sits directly below the middle of the query heads that share it. -->
+    <div class="flex flex-col gap-3">
+      <div>
+        <div class="text-[10px] opacity-60 mb-1">H = {{ H }} query heads (each asks a different question)</div>
+        <div class="head-grid" :style="{ gridTemplateColumns: `repeat(${H}, 1fr)` }">
+          <div
+            v-for="qh in queryHeads"
+            :key="`q${qh.id}`"
+            class="cell-wrap"
+          >
+            <div
+              class="head-box query-box transition-colors duration-300"
+              :style="{ background: groupColor(qh.group, G) }"
+              :title="`query head ${qh.id} → KV group ${qh.group}`"
+            />
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- KV heads row, sized so cache footprint shrinks visually -->
-    <div>
-      <div class="text-[10px] opacity-60 mb-1">G = {{ G }} KV head{{ G === 1 ? '' : 's' }} ({{ H / G }} queries each)</div>
-      <div class="flex gap-[2px] items-stretch">
-        <div
-          v-for="g in G"
-          :key="`kv${g}`"
-          class="h-10 rounded-sm flex items-center justify-center text-[9px] text-zinc-900 font-semibold transition-all duration-300"
-          :style="{
-            background: groupColor(g - 1, G),
-            width: `${(720 / H)}px`,
-          }"
-        >KV</div>
+      <div>
+        <div class="text-[10px] opacity-60 mb-1">G = {{ G }} KV head{{ G === 1 ? '' : 's' }} ({{ H / G }} queries each — sharing widens as G shrinks)</div>
+        <div class="head-grid" :style="{ gridTemplateColumns: `repeat(${H}, 1fr)` }">
+          <div
+            v-for="g in G"
+            :key="`kv${g}`"
+            class="cell-wrap"
+            :style="{ gridColumn: `span ${H / G}` }"
+          >
+            <div
+              class="head-box kv-box transition-all duration-300"
+              :style="{ background: groupColor(g - 1, G) }"
+              :title="`KV head ${g - 1}`"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -172,3 +182,35 @@ function groupColor(g: number, total: number): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+/*
+  Both rows share an H-column CSS grid (same total width). Query heads occupy
+  one column each; KV heads span H/G columns each. The inner box sits with a
+  fixed width centered within its span so:
+    - all boxes have the same on-screen width
+    - KV boxes are spaced apart proportionally as G shrinks
+    - each KV box sits directly under the middle of its query group
+*/
+.head-grid {
+  display: grid;
+  width: 640px;
+  max-width: 100%;
+  column-gap: 2px;
+  row-gap: 0;
+}
+.cell-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.head-box {
+  width: 14px;
+  height: 22px;
+  border-radius: 3px;
+}
+.kv-box {
+  /* Slightly taller to differentiate the row visually, but same width */
+  height: 28px;
+}
+</style>

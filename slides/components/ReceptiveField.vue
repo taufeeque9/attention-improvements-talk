@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /*
   ReceptiveField — illustrate how SWA's per-layer window expands into a
-  much larger effective receptive field through depth.
+  much larger effective receptive field through depth, for a *decoder-only*
+  (causal) model. Every modern frontier model that interleaves SWA with
+  full-attention is decoder-only and causal, so the band extends only to
+  the LEFT of the focus token — never to the right.
 
-  Reads as: focus token at the *bottom*, layers stacked upward. Each
-  row's highlighted band shows the *receptive field at that layer* — i.e.
-  which token positions contributed to the focus's representation by the
-  end of that layer's attention. Band widens as we go up (deeper layer →
-  more accumulated context), so the shape is a downward-pointing triangle
-  with the wide base on top, matching the "reach grows with depth" framing.
+  Reads as: focus token at the bottom-right; layers stacked upward; band
+  fans left and up, widening at deeper layers. Cells to the right of the
+  focus exist (so the audience sees them) but are never attended to.
 */
 
 const props = withDefaults(defineProps<{
@@ -22,21 +22,26 @@ const cellW = props.size / props.tokens;
 const layerH = 28;
 const totalH = props.layers * layerH + 12;
 
-// Center column — the position whose receptive field we're tracking.
-const focus = Math.floor(props.tokens / 2);
+/*
+  Place the focus near the right edge so the leftward causal wedge fits,
+  while leaving a small strip of "future" cells visible on the right —
+  they exist in the diagram (greyed out) but are never highlighted,
+  making the causal-mask story visible.
+*/
+const focus = props.tokens - 3;
 
 /*
-  Receptive field radius at a given layer (1-indexed).
-  Layer L's RF = L * window tokens on each side of focus.
-  Row index in the SVG is `layerFromTop` (0 = top row); the top row
-  represents the deepest layer (props.layers), so the wide band sits there.
+  Causal receptive-field radius at a given layer.
+  Layer L can reach L * window tokens to the left of focus (inclusive of
+  focus itself). Row index `layerFromTop` (0 = top row) maps to the
+  deepest layer, so the widest band sits at the top.
 */
 function reachAt(layerFromTop: number): { lo: number; hi: number } {
   const layerNum = props.layers - layerFromTop; // top row → deepest
   const radius = layerNum * props.window;
   return {
     lo: Math.max(0, focus - radius),
-    hi: Math.min(props.tokens - 1, focus + radius),
+    hi: focus, // causal: never attend to future positions
   };
 }
 </script>

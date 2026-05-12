@@ -717,11 +717,10 @@ where we attack that.
 
 <v-clicks>
 
-**Stage the context length.** Pretrain at **4K** for 14.8T tokens (where $O(n^2)$ is cheap), then YaRN-extend to **32K** then **128K** — just 1000 steps each, **only ~4% of total training cost** (Table 1).
-
-**Mixed precision.** Linear layers in **FP8** for speed and memory; **attention stays in BF16** (precision-sensitive softmax, small gradients); custom **E5M6 FP8** for the linear-after-attention activations (extra mantissa bits where the backward path needs them).
-
-**Activation checkpointing — MLA-aware.** Don't store per-head K, V activations from forward. **Recompute them from the cached latent $c^{KV}$ during backward.** One extra matmul on the way back, big activation memory saved — only cheap because MLA's up-projection is from a small latent.
+- **Staged context.** Pretrain at **4K**, then YaRN-extend to **32K** → **128K** in 1000 steps each.
+  - Context extension is **~4% of total training cost**.
+- **Mixed precision.** Linears in **FP8**; attention stays **BF16**; custom **E5M6** for the linear after attention.
+- **MLA-aware recompute.** Don't store per-head $K, V$ in forward — recompute from the cached latent $c^{KV}$ on backward. Cheap because the up-projection is from a small latent.
 
 </v-clicks>
 
@@ -729,7 +728,7 @@ where we attack that.
 
 <div class="pt-3 text-center text-amber-500 text-sm">
 
-Dense MLA scales to frontier at $5.6M because attention is *carefully bounded*: short pretraining context + precision-aware kernel choices + MLA-specific activation tricks.
+Dense MLA reaches frontier at $5.6M only with **careful bounding** — short pretraining context + precision discipline + MLA-specific recompute.
 
 </div>
 

@@ -421,7 +421,7 @@ each model's report as we hit them in the talk.
   <KVBlock kind="MHA" :H="32" :dk="128" />
   <KVBlock kind="GQA" :G="8" :H="32" :dk="128" />
   <KVBlock kind="MQA" :H="32" :dk="128" />
-  <KVBlock kind="MLA" :dc="576" :H="32" :dk="128" label="MLA · d_c+d_h^R" />
+  <KVBlock kind="MLA" :dc="576" :H="32" :dk="128" label="MLA · d<sub>c</sub>+d<sub>h</sub><sup>R</sup>" />
 </div>
 
 </v-click>
@@ -430,7 +430,6 @@ each model's report as we hit them in the talk.
 
 <div class="text-sm pt-1">
 
-- GQA's knob $G$ slides along the MHA ↔ MQA Pareto curve. **MLA leaves the curve.**
 - Cache *one* low-rank latent $c_t^{KV} \in \mathbb{R}^{d_c}$ per token. All $H$ query heads read it, each extracting its own K, V via $W^{UK}_i$, $W^{UV}_i$.
 
 </div>

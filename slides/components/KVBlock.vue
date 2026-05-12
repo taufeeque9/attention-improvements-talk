@@ -61,7 +61,7 @@ const derivedLabel = props.label ?? ({
   MHA: `MHA · H=${props.H}`,
   GQA: `GQA-${props.G}`,
   MQA: `MQA`,
-  MLA: `MLA · d_c=${props.dc}`,
+  MLA: `MLA · d<sub>c</sub>=${props.dc}`,
 } as const)[props.kind];
 
 const countLabel = `${elements.toLocaleString()} el`;
@@ -69,7 +69,7 @@ const countLabel = `${elements.toLocaleString()} el`;
 
 <template>
   <div class="kv-block inline-flex flex-col items-start gap-1">
-    <div class="text-xs opacity-70">{{ derivedLabel }}</div>
+    <div class="text-xs opacity-70" v-html="derivedLabel"></div>
     <svg :width="widthPx" height="56" :viewBox="`0 0 ${widthPx} 56`" class="rounded">
       <rect :width="widthPx" height="56" :fill="fill" fill-opacity="0.18" rx="3" />
       <g v-for="i in stripeCount" :key="i">

@@ -1,0 +1,22 @@
+# Node / Slidev
+node_modules/
+slides/.slidev/
+dist/
+*.log
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Slidev build artifacts
+slides/components/.cache/
+
+# Python / misc
+__pycache__/
+*.pyc
+.env

@@ -1,0 +1,8 @@
+/* Slidev bug workaround (still needed in v0.50.0):
+   when the Goto dialog is closed (positioned at -top-20), Fuse.js with an
+   empty query returns all slides, and the result list's max-height overflows
+   the off-screen parent and leaks onto the visible viewport.
+   Hide the result list whenever the dialog is in its closed position. */
+#slidev-goto-dialog[class~="-top-20"] .autocomplete-list {
+  display: none;
+}

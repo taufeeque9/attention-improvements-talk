@@ -115,7 +115,7 @@ function groupColor(g: number, total: number): string {
         class="ml-2 text-[10px] opacity-60 hover:opacity-100 underline"
         @click="resume"
       >resume autoplay</button>
-      <span v-else class="ml-2 text-[10px] opacity-50">▸ autoplay every {{ (intervalMs / 1000).toFixed(0) }}s</span>
+      
     </div>
 
     <!-- Query heads + KV heads on a shared H-column grid so the two rows align.
@@ -140,7 +140,7 @@ function groupColor(g: number, total: number): string {
       </div>
 
       <div>
-        <div class="text-[10px] opacity-60 mb-1">G = {{ G }} KV head{{ G === 1 ? '' : 's' }} ({{ H / G }} queries each — sharing widens as G shrinks)</div>
+        <div class="text-[10px] opacity-60 mb-1">G = {{ G }} KV head{{ G === 1 ? '' : 's' }} ({{ H / G }} queries each</div>
         <div class="head-grid" :style="{ gridTemplateColumns: `repeat(${H}, 1fr)` }">
           <div
             v-for="g in G"

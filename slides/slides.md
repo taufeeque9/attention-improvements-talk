@@ -150,14 +150,14 @@ What happens if we feed it a 1M-token prompt?
 | Quantity | $n = 1024$ (native) | $n = 100\text{k}$ | $n = 1\text{M}$ |
 |---|---|---|---|
 | Attention prefill FLOPs (all $L$ layers) | 193 GFLOPs | 1.8 PFLOPs | **184 PFLOPs** |
-| KV cache size (fp16) | 184 MB | 18 GB | **184 GB** |
+| KV cache size (bf16) | 184 MB | 18 GB | **184 GB** |
 | Decode bytes streamed per token | 180 KB | 18 GB | **184 GB** |
 
 </div>
 
 <v-click>
 
-On one **H100** (≈ 1 PFLOPs FP16 dense, 80 GB HBM3 @ 3.35 TB/s):
+On one **H100** (≈ 1 PFLOPs BF16 dense, 80 GB HBM3 @ 3.35 TB/s):
 
 - **Prefill attention at $n=1\text{M}$**: $\approx$ **184 s** (~3 min) of compute, attention math alone.
 - **KV cache at $n=1\text{M}$**: 184 GB — **doesn't fit on one H100.** Need 3+ GPUs just for the cache.
@@ -254,8 +254,6 @@ MQA → GQA → MLA
 
 <GQAExplorer :H="32" :dk="128" :initial-g="32" :interval-ms="2000" />
 
-<div class="text-[10px] opacity-50">Sweeps $G$ from MHA ($H$) → MQA (1) every 2 s. One knob: $G = H$ is MHA · $G = 1$ is MQA · in between is GQA-$G$. Cached K, V shrink by $H/G$.</div>
-
 <img src="./assets/gqa-figure2.png" class="rounded mt-1" style="max-height: 130px;" />
 
 <div class="text-[10px] opacity-50">Ainslie et al. 2023, Figure 2.</div>
@@ -273,14 +271,14 @@ the K/V projections and the cache shed dimensions. The figure makes the
 
 # The decode bottleneck — one generation step
 
-Cache holds $n$ tokens; generating the $(n+1)$th. Per layer, per step (cf. Shazeer 2019 §2.4.1 — asymptotic $\Theta(n/d + 1/b)$):
+Cache holds $n$ tokens; generating the $(n+1)$th. Per layer, per step:
 
 <v-clicks>
 
 **FLOPs:**
 $$\underbrace{8 b d^2}_{\text{4 projections}\, (Q,K,V,O)} \;+\; \underbrace{4 b n d}_{\text{attention }QK^\top \!+ AV}$$
 
-**Bytes loaded from HBM** (fp16):
+**Bytes loaded from HBM** (bf16):
 $$\underbrace{8 d^2}_{\text{weights — loaded once per step}} \;+\; \underbrace{4 b n d}_{\text{KV cache — per sequence}}$$
 
 **Arithmetic intensity** (FLOPs per byte):
@@ -335,9 +333,9 @@ For $H = 32$: MHA gives **1**, **GQA-8 gives 4** (open-frontier default), MQA gi
 
 <div class="text-sm pt-2">
 
-**Where's the cutoff?** Dense FP16 peak arithmetic intensity:
+**Where's the cutoff?** Dense BF16 peak arithmetic intensity:
 
-| GPU | Peak FP16 (dense) | HBM bandwidth | FLOPs / byte |
+| GPU | Peak BF16 (dense) | HBM bandwidth | FLOPs / byte |
 |---|---|---|---|
 | A100 (80 GB) | 312 TFLOPs | 2.0 TB/s | $\sim 156$ |
 | H100 (SXM5) | 989 TFLOPs | 3.35 TB/s | $\sim 295$ |

@@ -447,7 +447,7 @@ queries can each extract their own custom view of it.
 
 ---
 
-# MLA — three pieces
+# MLA — the two clean pieces
 
 <v-clicks>
 
@@ -461,20 +461,108 @@ DeepSeek-V2: cached latent $d_c + d_h^R = 576$ vs MHA's $2 H d_h = 32{,}768$ raw
 
 $W^{UK}$ folds into $W^Q$; $W^{UV}$ folds into $W^O$. Per query, attention is a $d_c$-dim dot product against the cached latent. **K and V are never materialized.** No decompression cost.
 
-**3. Decoupled RoPE** (the engineering scar):
-
-RoPE's $R_t$ matrix gets between $W^{UK}$ and the latent — breaks absorption. Fix: carry position on a tiny separate channel ($d_h^R = d_h / 2 = 64$, shared across heads), concatenated to the absorbable part.
-
 </v-clicks>
 
+<v-click>
+
+<div class="pt-3 text-amber-500 text-sm">
+…but there's a third piece: <b>RoPE breaks the absorption trick</b>. Next two slides recap RoPE and show the fix.
+</div>
+
+</v-click>
+
 <!--
-Three pieces, increasing in subtlety:
+Two clean pieces here, the messy third gets its own pair of slides:
   (1) Compression — obvious if you've seen low-rank approximation.
   (2) Absorption — the trick that makes (1) actually pay off. Without it,
       you save bytes but pay them back in decompression FLOPs.
-  (3) Decoupled RoPE — the kludge that shows absorption almost broke.
-The first two on this slide are the conceptual win; the third is what
-makes shipping engineers nervous about adopting MLA.
+
+The "RoPE breaks absorption" line at the bottom is the hook into the
+next two slides — first a 30-second RoPE refresher, then a diagram of
+the conflict and the side-channel fix.
+-->
+
+---
+
+# RoPE in 30 seconds
+
+<div class="grid grid-cols-[1.3fr_1fr] gap-4 items-center">
+
+<RoPESpinner :pairs="4" :max-pos="16" :tick-ms="280" :size="120" :d="64" />
+
+<div class="text-sm">
+
+- Rotary Position Embedding (Su et al. 2021). **The standard positional encoding** in every model in this talk.
+- **Where:** applied to $q$ and $k$ before the dot product. *Not* applied to $v$.
+- **How:** split $q, k$ into pairs of dims; rotate pair $i$ by angle $\theta_i \cdot p$ at position $p$, with $\theta_i = 1 / 10000^{2i/d}$. *High-freq pairs spin fast, low-freq pairs barely move.*
+- **Why it works:** $(R_{p_q} q_0)^\top (R_{p_k} k_0) = q_0^\top R_{p_k - p_q} k_0$. The dot product depends only on the **relative offset**.
+
+</div>
+
+</div>
+
+<div class="text-[10px] opacity-50 mt-2 text-center">
+Loop: position $p$ ticks 0 → 16 → wrap. Yellow vector = rotated; dashed ghost = unrotated reference. Pair $i$ = 0 spins fast; large $i$ spins slowly.
+</div>
+
+<!--
+The recap nobody plans for. Audience knows the *name* "RoPE" but often
+not the geometry. Spend 30 seconds:
+  - Geometry: pair-wise 2D rotations. Watch the fast / slow pairs.
+  - Algebra: the rotation matrix factors into the dot product, leaving
+    only relative position. THIS is why RoPE generalizes to longer
+    contexts than learned positional embeddings.
+  - Anatomy: applied only to q and k, only inside attention. Not
+    everywhere — that's important for the MLA conflict on the next slide.
+-->
+
+---
+
+# MLA × RoPE — why absorption almost broke
+
+<MLARoPE :interval-ms="4000" />
+
+<div class="text-sm pt-2 grid grid-cols-3 gap-3 text-xs opacity-80">
+
+<div>
+
+**No RoPE:** $W^Q$ absorbs $W^{UK}$ at inference. Per query, one matmul against the $d_c$-dim latent. Cheap.
+
+</div>
+
+<div>
+
+**Naive RoPE:** position-dependent $R_p$ sits between $W^{UK}$ and the latent. Can't pre-fold — $R_p$ is different for every token. **Decompression cost returns.**
+
+</div>
+
+<div>
+
+**Fix:** split $k$ into content $k^C = W^{UK} c$ (no RoPE, absorbable) and a tiny rotated side channel $k^R = R_p W^{KR} h$ ($d_h^R = 64$, shared across heads). Concat, then dot with $q$.
+
+</div>
+
+</div>
+
+<!--
+Three stages cycle every 4 s. Walk through them:
+
+(1) "No RoPE": absorption works. W^Q · W^UK can be precomputed; per query,
+    we dot the result with c directly. The KV cache is just c — small.
+
+(2) "Naive RoPE": apply RoPE on K_raw. Now the chain is q · R_p · W^UK · c.
+    R_p depends on the position of the cached token, which is different
+    for every entry. We can't fold W^UK into q anymore — we'd have to
+    materialize K_rot per token, and we're back to MHA's bandwidth pain.
+
+(3) Fix: split. Most of K stays absorbable (no RoPE). A small extra
+    channel carries position. Final attention sums two dot products.
+    The content path retains the bandwidth win; the rotated channel is
+    tiny (64 dims, shared across H heads, not H × 64) so the overhead
+    is negligible.
+
+THIS is what DeepSeek-V2 §2.1.3 calls "Decoupled RoPE." The diagram
+makes clear why it exists — and why DSA / V4 keep using the same trick.
 -->
 
 ---
@@ -501,7 +589,7 @@ Pareto-strict: MLA dominates MHA on **size AND quality** on hard benchmarks.
 
 <div class="pt-3 text-center text-amber-500 text-sm">
 
-📌 Yet only **DeepSeek family + Kimi K2** adopted MLA. Llama, Mistral, Qwen 2.5/3, Gemma, Phi-4, Command A stayed with GQA. Implementation complexity vs the easier $G$ knob.
+📌 Slow adoption: **DeepSeek family + Kimi K2** for 18 months, then **Mistral Large 3** (Dec 2025) and **GLM-5** (Feb 2026, MLA + DSA) joined. Llama, Qwen 2.5/3, Gemma, Phi-4, Command A, OLMo, GPT-OSS still on GQA. The most-cited barrier: **MLA is incompatible with QK-Norm**, which has become the default training-stability trick.
 
 </div>
 

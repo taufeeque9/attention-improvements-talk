@@ -250,23 +250,15 @@ MQA → GQA → MLA
 
 # MQA → GQA: shared KV memory across heads
 
-<div class="grid grid-cols-[1.1fr_1fr] gap-6 items-start">
+<div class="flex flex-col items-center gap-3">
 
-<div>
+<GQAExplorer :H="32" :dk="128" :initial-g="32" :interval-ms="2000" />
 
-<GQAExplorer :H="32" :dk="128" :initial-g="8" />
+<div class="text-[10px] opacity-50">Sweeps $G$ from MHA ($H$) → MQA (1) every 2 s. One knob: $G = H$ is MHA · $G = 1$ is MQA · in between is GQA-$G$. Cached K, V shrink by $H/G$.</div>
 
-<div class="text-[10px] opacity-50 mt-3">Click chips to step G across the MHA ↔ MQA spectrum. One knob: $G = H$ is MHA · $G = 1$ is MQA · in between is GQA-$G$. Cached K, V shrink by $H/G$.</div>
+<img src="./assets/gqa-figure2.png" class="rounded mt-1" style="max-height: 130px;" />
 
-</div>
-
-<div>
-
-<img src="./assets/gqa-figure2.png" class="rounded" />
-
-<div class="text-[10px] opacity-50 mt-1">Ainslie et al. 2023, Figure 2.</div>
-
-</div>
+<div class="text-[10px] opacity-50">Ainslie et al. 2023, Figure 2.</div>
 
 </div>
 

@@ -19,7 +19,7 @@ selectable: true
 The post-2017 improvements that made long-context agentic LLMs possible
 
 <div class="pt-12">
-  <span class="text-sm opacity-70">45 minutes · deep dive · audience knows the 2017 transformer</span>
+  <span class="text-sm opacity-70">Mohammad Taufeeque</span>
 </div>
 
 <!--
@@ -104,31 +104,19 @@ layout: section
 
 # Prefill vs. decode are *different* problems
 
-<div grid="~ cols-2 gap-8">
+<PrefillVsDecode :n="16" :size="240" />
+
+<div class="grid grid-cols-2 gap-8 pt-3 text-xs opacity-80">
 
 <div>
 
-### Prefill
-
-Process the prompt — $n$ tokens — in parallel.
-
-- Compute: $O(n^2)$ per layer (the logits matrix)
-- Memory: $O(n \cdot d)$ for activations, KV
-- **Compute-bound** on modern GPUs
-
-A 1M-token prompt is roughly $10^{12}$ attention FLOPs *per layer.*
+$O(n^2)$ compute per layer · $O(n \cdot d)$ activations · 1M-token prompt $\approx 10^{12}$ FLOPs / layer
 
 </div>
 
 <div>
 
-### Decode
-
-Generate one token at a time, autoregressively.
-
-- Compute per step: $O(n \cdot d)$
-- Memory traffic per step: re-read the entire KV cache of size $O(b \cdot H \cdot n \cdot d_k)$
-- **Memory-bandwidth-bound**
+$O(n \cdot d)$ compute per step · re-stream KV cache $O(b \cdot H \cdot n \cdot d_k)$ bytes / token
 
 </div>
 
@@ -136,8 +124,8 @@ Generate one token at a time, autoregressively.
 
 <v-click>
 
-<div class="pt-6 text-center text-amber-500 font-semibold">
-Both get worse with context length. Both have to be attacked, but with different tools.
+<div class="pt-3 text-center text-amber-500 font-semibold">
+Both get worse with context length. Each wall needs different tools.
 </div>
 
 </v-click>
@@ -308,18 +296,25 @@ MQA → GQA → MLA
 
 # MQA → GQA: shared KV memory across heads
 
-<img src="./assets/gqa-figure2.png" class="rounded mx-auto" style="max-height: 280px;" />
+<div class="grid grid-cols-[1.1fr_1fr] gap-6 items-start">
 
-<v-clicks>
+<div>
 
-- $H$ query heads — each asks a different question.
-- $G$ KV-head pairs — each shared across one group of $H/G$ query heads.
-- **One knob.** $G = H$ recovers MHA; $G = 1$ is MQA; in between is GQA-$G$.
-- Cached K, V shrink by factor $H / G$.
+<GQAExplorer :H="32" :dk="128" :initial-g="8" />
 
-</v-clicks>
+<div class="text-[10px] opacity-50 mt-3">Click chips to step G across the MHA ↔ MQA spectrum. One knob: $G = H$ is MHA · $G = 1$ is MQA · in between is GQA-$G$. Cached K, V shrink by $H/G$.</div>
 
-<div class="text-xs opacity-50 mt-2">Ainslie et al. 2023, Figure 2. The two end points are Shazeer 2019 (MQA) and Vaswani et al. 2017 (MHA).</div>
+</div>
+
+<div>
+
+<img src="./assets/gqa-figure2.png" class="rounded" />
+
+<div class="text-[10px] opacity-50 mt-1">Ainslie et al. 2023, Figure 2.</div>
+
+</div>
+
+</div>
 
 <!--
 The whole arc of MQA → GQA on one slide. Queries keep their diversity.
@@ -568,22 +563,27 @@ simpler retrofit. Open question to leave with the audience.
 
 # The full arc — arithmetic intensity climbed from 1 to ~240
 
-<div class="text-sm pt-4">
-
-| Variant | FLOPs / byte | Gap to H100 peak ($\sim 290$) |
-|---|---|---|
-| MHA | $1$ | $\sim 290\times$ short |
-| GQA-8 ($H = 32$) | $4$ | $\sim 70\times$ short |
-| MQA ($H = 32$) | $32$ | $\sim 9\times$ short |
-| **MLA** ($H = 128, d_c = 512$) | $\mathbf{\approx 240}$ | **within $\sim 20\%$ of peak** |
-
+<div class="flex justify-center pt-2">
+<Roofline
+  :peak="290"
+  :x-min="0.5"
+  :x-max="600"
+  :width="640"
+  :height="300"
+  :markers="[
+    { x: 1,   label: 'MHA',     color: '#60a5fa' },
+    { x: 4,   label: 'GQA-8',   color: '#a78bfa' },
+    { x: 32,  label: 'MQA',     color: '#f472b6' },
+    { x: 240, label: 'MLA',     color: '#34d399' },
+  ]"
+/>
 </div>
 
 <v-click>
 
-<div class="pt-6 text-center text-amber-500 font-semibold">
+<div class="pt-3 text-center text-amber-500 font-semibold text-sm">
 
-MLA closes the gap to H100 peak by $\sim 240\times$ vs vanilla MHA, *without* MQA's quality cost. The bandwidth wall — the whole motivation for compressing the KV cache — is almost closed.
+MLA reaches within ~20% of H100 peak — *without* MQA's quality cost. The decode bandwidth wall is almost closed.
 
 </div>
 
@@ -684,7 +684,7 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 <div class="text-sm pt-3">
 
-**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA with full-attention layers: **Gemma 2** (1:1, $w$=4096), **Gemma 3** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE). The pure-SWA approach didn't last — frontier moved to interleaving.
+**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA-like layers with full-attention: **Gemma 2** (1:1, $w$=4096), **Gemma 3** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE, 3:1 chunked-RoPE : Full-NoPE). The pure-SWA approach didn't last — frontier moved to interleaving.
 
 </div>
 
@@ -1193,6 +1193,39 @@ and stabilizes training, especially in long-context + sparse where
 Open question: how much of this is also in closed frontier models
 (GPT-5, Claude, Gemini)? We can't know — they don't publish — but
 V4 is the best public window into what's likely shared.
+-->
+
+---
+
+# The shape zoo — every attention pattern in one place
+
+<div class="grid grid-cols-3 gap-4 pt-2">
+
+<AttnMask preset="causal"          :n="28" :size="150" color="#94a3b8" title="Dense (causal)" />
+<AttnMask preset="sliding-window"  :n="28" :size="150" :window="5" color="#60a5fa" title="SWA (Longformer / Mistral)" />
+<AttnMask preset="nsa-slc"         :n="28" :size="150" :block="4" :picks="2" color="#a78bfa" title="NSA — selected blocks" />
+<AttnMask preset="dsa-topk"        :n="28" :size="150" :picks="4" color="#f472b6" title="DSA — scattered top-k" />
+<AttnMask preset="v4-csa"          :n="28" :size="150" :block="4" :picks="2" :window="3" color="#34d399" title="V4 CSA — compressed + top-k + SWA" />
+<AttnMask preset="v4-hca"          :n="28" :size="150" :block="8" :window="3" color="#fbbf24" title="V4 HCA — heavily compressed, dense" />
+
+</div>
+
+<div class="pt-4 text-center text-xs opacity-70">
+Same axes everywhere — row $i$ = query at position $i$, column $j$ = key it attends to. Coverage shrinks from full triangle (dense) → diagonal stripe (SWA) → handful of blocks (NSA / DSA / V4).
+</div>
+
+<!--
+The single visual that ties (c) together. Every method we covered chooses
+WHICH keys each query reads. The shapes are not arbitrary — they reflect
+where each method bets the signal lives:
+  - Dense: bet nothing, read everything.
+  - SWA: bet locality + depth (stacked layers → effective receptive field).
+  - NSA: bet on three scales (cmp + slc + win), gated.
+  - DSA: bet on a learned scorer's top-k.
+  - V4 CSA: bet on compressed top-k + recent window, one softmax.
+  - V4 HCA: bet on a coarse summary of everything.
+Patterns here are illustrative — actual block sizes and selection counts
+in production are larger; the relative shape is what matters.
 -->
 
 ---

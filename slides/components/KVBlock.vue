@@ -64,7 +64,7 @@ const derivedLabel = props.label ?? ({
   MLA: `MLA · d<sub>c</sub>=${props.dc}`,
 } as const)[props.kind];
 
-const countLabel = `${elements.toLocaleString()} el`;
+const countLabel = `${elements.toLocaleString()} elements`;
 </script>
 
 <template>
@@ -84,6 +84,6 @@ const countLabel = `${elements.toLocaleString()} el`;
         />
       </g>
     </svg>
-    <div v-if="showCount" class="text-[10px] opacity-60 tabular-nums">{{ countLabel }} / tok</div>
+    <div v-if="showCount" class="text-[10px] opacity-60 tabular-nums">{{ countLabel }} / token</div>
   </div>
 </template>

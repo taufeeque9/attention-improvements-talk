@@ -503,7 +503,7 @@ queries can each extract their own custom view of it.
 
 $$c_t^{KV} = W^{DKV} h_t, \qquad k_t^C = W^{UK} c_t^{KV}, \;\; v_t^C = W^{UV} c_t^{KV}$$
 
-DeepSeek-V2: $d_c = 4 d_h = 512$ vs MHA's $2 H d_h = 32{,}768$ raw KV elements per token. **~64× compression in element count.**
+DeepSeek-V2: cached latent $d_c + d_h^R = 576$ vs MHA's $2 H d_h = 32{,}768$ raw KV elements per token. **~57× compression in element count.**
 
 **2. Absorption at inference** (the magic):
 
@@ -684,7 +684,7 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 <div class="text-sm pt-3">
 
-**In frontier decoder-only LLMs**, SWA is *interleaved* with periodic full-attention layers: **Mistral 7B**, **Gemma 2/3**, **Llama 4 (iRoPE)**, **Cohere Command A**. The fully-SWA approach didn't win — frontier wants both.
+**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA with full-attention layers: **Gemma 2** (1:1, $w$=4096), **Gemma 3** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE). The pure-SWA approach didn't last — frontier moved to interleaving.
 
 </div>
 
@@ -844,7 +844,7 @@ $$N_t \;=\; \underbrace{\lfloor t/d \rfloor}_{\text{compression}} \;+\; \underbr
 
 Paper's hyperparameters: $l = 32$, $d = 16$, $n = 16$, $w = 512$. **At 32K context, NSA averages ~2560 active tokens / query — 8% of context** (paper §4.2). The 11.6× decode speedup at 64K (Figure 1) is the wall-clock consequence.
 
-**Top-$n$ selection is almost free.** Block importance scores come from *reusing the compression branch's attention output* (eq. 9). No separate routing computation.
+**Top-$n$ selection is almost free.** Block importance scores come from *reusing the compression branch's attention output* (eq. 8; eq. 9 handles the block-scheme conversion when $l' \neq l$). No separate routing computation.
 
 **Each branch has independent $K, V$ projections.** Without this, the easy-to-learn sliding-window branch's gradients dominate → compression and selection branches *starve* and never specialize. Independent projections let each branch learn its own representation.
 
@@ -1201,16 +1201,25 @@ V4 is the best public window into what's likely shared.
 
 <div class="text-sm pt-2">
 
-- **SSM / linear hybrids** — Mamba, Mamba-2, Jamba, **Nemotron-3 Super**. Replace attention rather than fix it: linear-time recurrence, constant-state. Open question: do these threads converge, or stay separate paths to long-context agentic models?
-- **Kernels** — FlashAttention v1→v3 (IO-aware tiled attention; never materialize the $n{\times}n$ matrix), PagedAttention (KV-cache as virtual memory pages). The systems layer that makes everything in this talk run.
-- **Distributed long-context** — Ring Attention (sequence-parallel attention across GPUs), rumored to underpin Gemini 1.5's 1M context.
-- **Other patterns** — MoBA (Kimi, MoE-style routing over attention blocks), StreamingLLM (attention sinks beyond V4's use).
+- **SSM / linear hybrids** — Mamba, Mamba-2, Jamba, **Nemotron-3 Super**
+  - Replace attention, don't fix it
+  - Linear-time recurrence, constant-state
+  - Open Q: do the two threads converge?
+- **Kernels & serving**
+  - FlashAttention v1→v3 — IO-aware tiling, no $n{\times}n$ matrix
+  - PagedAttention — KV cache as virtual memory pages
+- **Distributed long-context**
+  - Ring Attention — sequence-parallel attention
+  - Rumored behind Gemini 1.5's 1M context
+- **Other patterns**
+  - MoBA (Kimi) — MoE-style routing over attention blocks
+  - StreamingLLM — attention sinks
 
 </div>
 
 <div class="pt-3 text-amber-500 text-sm">
 
-Each of these is its own talk. Happy to do follow-ups.
+Each is its own talk.
 
 </div>
 

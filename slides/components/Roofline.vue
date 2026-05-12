@@ -73,7 +73,7 @@ function isVisible(idx: number): boolean {
 </script>
 
 <template>
-  <svg :width="width" :height="height" :viewBox="`0 0 ${width} ${height}`" class="rounded bg-zinc-900/20">
+  <svg :width="width" :height="height" :viewBox="`0 0 ${width} ${height}`" class="roofline rounded bg-zinc-900/20">
     <!-- Bandwidth-bound shaded region (below ridge) -->
     <polygon
       :points="`${padL},${padT + innerH} ${ridgePoints} ${padL + innerW},${padT + innerH}`"
@@ -97,14 +97,14 @@ function isVisible(idx: number): boolean {
     <!-- X ticks -->
     <g v-for="t in xTicks" :key="`xt${t}`">
       <line :x1="xPos(t)" :y1="padT + innerH" :x2="xPos(t)" :y2="padT + innerH + 4" stroke="#aaa" />
-      <text :x="xPos(t)" :y="padT + innerH + 16" text-anchor="middle" fill="#999" font-size="10">
+      <text :x="xPos(t)" :y="padT + innerH + 14" text-anchor="middle" fill="#999" class="tick-label">
         {{ t >= 1000 ? `${t/1000}k` : t }}
       </text>
     </g>
-    <text :x="padL + innerW / 2" :y="height - 6" text-anchor="middle" fill="#bbb" font-size="11">
+    <text :x="padL + innerW / 2" :y="height - 4" text-anchor="middle" fill="#bbb" class="axis-label">
       arithmetic intensity (FLOPs / byte, log)
     </text>
-    <text :x="14" :y="padT + innerH / 2" text-anchor="middle" fill="#bbb" font-size="11"
+    <text :x="14" :y="padT + innerH / 2" text-anchor="middle" fill="#bbb" class="axis-label"
           :transform="`rotate(-90, 14, ${padT + innerH / 2})`">
       throughput / peak
     </text>
@@ -115,7 +115,7 @@ function isVisible(idx: number): boolean {
     <!-- Peak horizontal dashed reference -->
     <line :x1="xPos(peak)" :y1="yPos(1)" :x2="padL + innerW" :y2="yPos(1)"
           stroke="#34d399" stroke-width="1" stroke-dasharray="4 3" opacity="0.55" />
-    <text :x="padL + innerW - 4" :y="yPos(1) - 4" text-anchor="end" fill="#34d399" font-size="10">
+    <text :x="padL + innerW - 4" :y="yPos(1) - 4" text-anchor="end" fill="#34d399" class="peak-label">
       peak ≈ {{ peak }}
     </text>
 
@@ -143,13 +143,41 @@ function isVisible(idx: number): boolean {
         />
         <text
           :x="xPos(m.x)"
-          :y="yPos(throughputAt(m.x)) - 10"
+          :y="yPos(throughputAt(m.x)) - 8"
           text-anchor="middle"
           :fill="m.color || '#fbbf24'"
-          font-size="11"
-          font-weight="600"
+          class="marker-label"
         >{{ m.label }}</text>
       </g>
     </g>
   </svg>
 </template>
+
+<style scoped>
+/*
+  Lock SVG text sizing in CSS. Slidev's theme cascades a large base
+  font-size (~28-32px) onto descendants; SVG attribute-based font-size
+  loses to inherited CSS in some browsers, so the labels balloon out of
+  proportion to the chart geometry. Pin everything in absolute px here.
+*/
+svg.roofline {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+svg.roofline text {
+  font-size: 10px;
+  line-height: 1;
+}
+svg.roofline .tick-label {
+  font-size: 9px;
+}
+svg.roofline .axis-label {
+  font-size: 10px;
+}
+svg.roofline .peak-label {
+  font-size: 9px;
+}
+svg.roofline .marker-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+</style>

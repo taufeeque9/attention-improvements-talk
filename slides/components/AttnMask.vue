@@ -106,7 +106,7 @@ const cell = props.size / props.n;
       :width="size"
       :height="size"
       :viewBox="`0 0 ${size} ${size}`"
-      class="rounded bg-zinc-900/30"
+      class="attn-mask-svg rounded bg-zinc-900/30"
     >
       <!-- causal diagonal hint -->
       <line x1="0" y1="0" :x2="size" :y2="size" stroke="#888" stroke-width="0.4" stroke-dasharray="2 2" opacity="0.35" />
@@ -130,8 +130,19 @@ const cell = props.size / props.n;
         :y="size - 2"
         text-anchor="middle"
         fill="#888"
-        font-size="9"
+        class="axis-hint"
       >key j →</text>
     </svg>
   </div>
 </template>
+
+<style scoped>
+/* Pin SVG text size in CSS — Slidev's theme cascades a large base font-size
+   to descendants and SVG attribute-based font-size can lose to it. */
+svg.attn-mask-svg {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+svg.attn-mask-svg .axis-hint {
+  font-size: 9px;
+}
+</style>

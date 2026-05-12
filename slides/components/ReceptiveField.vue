@@ -32,7 +32,7 @@ function reachAt(layerFromTop: number): { lo: number; hi: number } {
 </script>
 
 <template>
-  <svg :width="size" :height="totalH" :viewBox="`0 0 ${size} ${totalH}`" class="rounded bg-zinc-900/30">
+  <svg :width="size" :height="totalH" :viewBox="`0 0 ${size} ${totalH}`" class="receptive-field-svg rounded bg-zinc-900/30">
     <g v-for="L in layers" :key="`l${L}`">
       <g v-for="t in tokens" :key="`l${L}t${t}`">
         <rect
@@ -50,7 +50,7 @@ function reachAt(layerFromTop: number): { lo: number; hi: number } {
         />
       </g>
       <!-- Layer label -->
-      <text :x="size - 6" :y="(L - 1) * layerH + layerH / 2 + 10" font-size="10" fill="#888" text-anchor="end">
+      <text :x="size - 6" :y="(L - 1) * layerH + layerH / 2 + 10" fill="#888" text-anchor="end" class="layer-label">
         layer {{ layers - L + 1 }}
       </text>
     </g>
@@ -68,3 +68,12 @@ function reachAt(layerFromTop: number): { lo: number; hi: number } {
     />
   </svg>
 </template>
+
+<style scoped>
+svg.receptive-field-svg {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+svg.receptive-field-svg .layer-label {
+  font-size: 10px;
+}
+</style>

@@ -14,9 +14,9 @@ mdc: true
 selectable: true
 ---
 
-# Attention, after *Attention is All You Need*
+# Nine years of improving *Attention*
 
-The post-2017 improvements that made long-context agentic LLMs possible
+Post-2017 improvements that make long-context agentic LLMs possible
 
 <div class="pt-12">
   <span class="text-sm opacity-70">Mohammad Taufeeque</span>
@@ -469,17 +469,31 @@ each model's report as we hit them in the talk.
 
 # MLA: compress to a latent, not share heads
 
-<img src="./assets/mla-figure3.png" class="rounded mx-auto" style="max-height: 240px;" />
+<img src="./assets/mla-figure3.png" class="rounded mx-auto" style="max-height: 220px;" />
+
+<v-click>
+
+<div class="flex justify-center items-end gap-6 pt-3">
+  <KVBlock kind="MHA" :H="32" :dk="128" />
+  <KVBlock kind="GQA" :G="8" :H="32" :dk="128" />
+  <KVBlock kind="MQA" :H="32" :dk="128" />
+  <KVBlock kind="MLA" :dc="576" :H="32" :dk="128" label="MLA · d_c+d_h^R" />
+</div>
+
+</v-click>
 
 <v-clicks>
 
-- GQA's knob $G$ slides along the MHA ↔ MQA Pareto curve.
-- **MLA leaves the curve.** Cache a low-rank latent $c_t^{KV} \in \mathbb{R}^{d_c}$ with $d_c \ll d_h n_h$. *One* shared latent per token.
-- All $H$ query heads read the same latent — each extracts a different K, V via its own up-projection $W^{UK}_i$, $W^{UV}_i$.
+<div class="text-sm pt-1">
+
+- GQA's knob $G$ slides along the MHA ↔ MQA Pareto curve. **MLA leaves the curve.**
+- Cache *one* low-rank latent $c_t^{KV} \in \mathbb{R}^{d_c}$ per token. All $H$ query heads read it, each extracting its own K, V via $W^{UK}_i$, $W^{UV}_i$.
+
+</div>
 
 </v-clicks>
 
-<div class="text-xs opacity-50 mt-2">DeepSeek-AI 2024, Figure 3. The fourth panel is the new shape.</div>
+<div class="text-[10px] opacity-50 mt-1">DeepSeek-AI 2024, Figure 3. Strip below shows cached bytes/token to scale.</div>
 
 <!--
 The figure is the talk's clearest visualization that MLA is structurally
@@ -671,12 +685,21 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 # Sliding window attention — depth does the long-range work
 
-<img src="./assets/longformer-figure2.png" class="rounded mx-auto" style="max-height: 180px;" />
+<div class="grid grid-cols-[1fr_1fr] gap-6 items-center">
+
+<img src="./assets/longformer-figure2.png" class="rounded" style="max-height: 160px;" />
+
+<div class="flex flex-col items-center">
+  <ReceptiveField :tokens="25" :layers="4" :window="2" :size="320" />
+  <div class="text-[10px] opacity-60 mt-1">Top token's reach grows ×$w$ per layer. 24 × 512 ≈ 12K effective context.</div>
+</div>
+
+</div>
 
 <v-clicks>
 
 - **SWA**: each token attends to $w$ neighbors. Compute drops from $O(n^2)$ to $O(n \cdot w)$.
-- **Receptive field grows with depth**: $\ell$ layers × window $w$ → $\ell \cdot w$ effective context. 24 layers × $w = 512$ → ~12K-token receptive field.
+- **Receptive field grows with depth**: $\ell$ layers × window $w$ → $\ell \cdot w$ effective context.
 
 </v-clicks>
 
@@ -842,7 +865,19 @@ clustering).
 
 $$N_t \;=\; \underbrace{\lfloor t/d \rfloor}_{\text{compression}} \;+\; \underbrace{n \cdot l'}_{\text{top-}n\text{ selection}} \;+\; \underbrace{w}_{\text{sliding}} \;\;\ll\;\; t$$
 
-Paper's hyperparameters: $l = 32$, $d = 16$, $n = 16$, $w = 512$. **At 32K context, NSA averages ~2560 active tokens / query — 8% of context** (paper §4.2). The 11.6× decode speedup at 64K (Figure 1) is the wall-clock consequence.
+Paper's hyperparameters: $l = 32$, $d = 16$, $n = 16$, $w = 512$. **At 32K context, NSA averages ~2560 active tokens / query — 8% of context** (paper §4.2). 11.6× decode speedup at 64K (Fig. 1) is the wall-clock consequence.
+
+<div class="pt-2">
+<SparsityBar
+  :total="32768"
+  :parts="[
+    { label: 'compression (t/d)', value: 2048, color: '#60a5fa' },
+    { label: 'top-n selection (n·l′)', value: 2048, color: '#a78bfa' },
+    { label: 'sliding window (w)', value: 512, color: '#34d399' },
+  ]"
+  :width="620"
+/>
+</div>
 
 **Top-$n$ selection is almost free.** Block importance scores come from *reusing the compression branch's attention output* (eq. 8; eq. 9 handles the block-scheme conversion when $l' \neq l$). No separate routing computation.
 

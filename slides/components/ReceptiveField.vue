@@ -18,7 +18,11 @@ const props = withDefaults(defineProps<{
   size?: number;
 }>(), { tokens: 25, layers: 4, window: 2, size: 360 });
 
-const cellW = props.size / props.tokens;
+// Reserve a left margin so layer labels (always on the left now) don't
+// overlap with the highlighted cells, which sit near the right edge of
+// the canvas under the causal layout.
+const padL = 42;
+const cellW = (props.size - padL) / props.tokens;
 const layerH = 28;
 const totalH = props.layers * layerH + 12;
 
@@ -51,7 +55,7 @@ function reachAt(layerFromTop: number): { lo: number; hi: number } {
     <g v-for="L in layers" :key="`l${L}`">
       <g v-for="t in tokens" :key="`l${L}t${t}`">
         <rect
-          :x="(t - 1) * cellW + 2"
+          :x="padL + (t - 1) * cellW + 2"
           :y="(L - 1) * layerH + 6"
           :width="cellW - 4"
           :height="layerH - 8"
@@ -59,20 +63,20 @@ function reachAt(layerFromTop: number): { lo: number; hi: number } {
             ? '#60a5fa'
             : '#475569'"
           :fill-opacity="(t - 1) >= reachAt(L - 1).lo && (t - 1) <= reachAt(L - 1).hi
-            ? 0.35 + (layers - L) * 0.15
-            : 0.15"
+            ? 0.55 + (layers - L) * 0.10
+            : 0.18"
           rx="2"
         />
       </g>
-      <!-- Layer label: top row = deepest layer; bottom row = layer 1 -->
-      <text :x="size - 6" :y="(L - 1) * layerH + layerH / 2 + 10" fill="#888" text-anchor="end" class="layer-label">
+      <!-- Layer label on the LEFT margin (the right side is full of cells) -->
+      <text :x="4" :y="(L - 1) * layerH + layerH / 2 + 10" fill="#aaa" text-anchor="start" class="layer-label">
         layer {{ layers - L + 1 }}
       </text>
     </g>
 
     <!-- Crown the focus column across all layers -->
     <rect
-      :x="focus * cellW + 2"
+      :x="padL + focus * cellW + 2"
       :y="6"
       :width="cellW - 4"
       :height="totalH - 12"
@@ -84,7 +88,7 @@ function reachAt(layerFromTop: number): { lo: number; hi: number } {
     />
     <!-- Solid crown around the focus cell at the bottom row (the query position) -->
     <rect
-      :x="focus * cellW + 2"
+      :x="padL + focus * cellW + 2"
       :y="(layers - 1) * layerH + 6"
       :width="cellW - 4"
       :height="layerH - 8"

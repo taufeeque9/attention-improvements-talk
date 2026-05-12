@@ -232,7 +232,7 @@ Get the audience comfortable with this ratio - we'll come back to it.
 
 # What we'll cover
 
-<div grid="~ cols-3 gap-6 pt-4">
+<div grid="~ cols-2 gap-8 pt-4">
 
 <div class="border-l-4 border-blue-400 pl-4">
 
@@ -242,7 +242,7 @@ Attacks decode bandwidth.
 
 - **MQA** — Shazeer 2019
 - **GQA** — Ainslie 2023
-- **MLA** — DeepSeek-V2 2024
+- **MLA** — DeepSeek-V2 2024 (→ V3 training)
 
 → shrink the cached K, V.
 
@@ -254,34 +254,23 @@ Attacks decode bandwidth.
 
 Attacks prefill compute.
 
-- **SWA** — Longformer / Mistral
+- **SWA** — Longformer / Mistral / Gemma / OLMo / GPT-OSS / …
 - **NSA** — DeepSeek 2025
 - **DSA** — DeepSeek-V3.2
-- **MoBA** — Kimi
 - **CSA + HCA** — DeepSeek-V4
 
 → each query reads $\ll n$ keys.
 
 </div>
 
-<div class="border-l-4 border-emerald-400 pl-4">
-
-### (d) Kernels & systems
-
-If time permits.
-
-- **FlashAttention** v1→v3
-- **PagedAttention**
-- Prefix caching
-
-→ make the dense baseline fast enough that sparse only wins at the limit.
-
-</div>
-
 </div>
 
 <div class="pt-8 text-center text-sm opacity-70">
-Then a synthesis: DeepSeek-V4 (Apr 2026) composes a token compressor + DSA-style sparse selection + sliding window + interleaved layers + MQA-core + attention sinks + mixed-precision KV. One model touches every category.
+Synthesis: <b>DeepSeek-V4</b> (Apr 2026) composes a token compressor + DSA-style sparse selection + sliding window + interleaved layers + MQA-core + attention sinks + mixed-precision KV. One model touches every category.
+</div>
+
+<div class="pt-3 text-center text-xs opacity-50">
+Out of scope (one slide at the end): FlashAttention, PagedAttention, MoBA, Ring Attention, SSM / linear hybrids.
 </div>
 
 ---
@@ -707,7 +696,7 @@ KV compression won decode bandwidth. Attention compute is still $O(n^2)$.
 
 <div class="text-sm pt-3">
 
-**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA-like layers with full-attention: **Gemma 2** (1:1, $w$=4096), **Gemma 3 / Gemma 4** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE, 3:1 chunked-RoPE : Full-NoPE), **OLMo 3** (3:1, $w$=4096). The pure-SWA approach didn't last — frontier moved to interleaving.
+**In frontier decoder-only LLMs**, **Mistral 7B** (2023) used pure SWA throughout. Subsequent models *interleave* SWA-like layers with full-attention: **Gemma 2** (1:1, $w$=4096), **Gemma 3 / Gemma 4-31B** (5:1, $w$=1024), **Cohere Command A** (3:1, SWA-RoPE : Full-NoPE), **Llama 4** (iRoPE, 3:1 chunked-RoPE : Full-NoPE), **OLMo 3** (3:1, $w$=4096), **GPT-OSS** (1:1, $w$=128, learned attention sinks). The pure-SWA approach didn't last — frontier moved to interleaving.
 
 </div>
 
@@ -1185,7 +1174,7 @@ provides redundancy + complementarity.
 <v-clicks>
 
 - **Partial RoPE** — only last 64 dims rotated. K=V means the output sum carries absolute position; V4 counter-rotates the output by $R(-p_i)$ to restore relative. (Not needed in standard attention where V isn't rotated.)
-- **Attention sink** — learnable $z'_h$ in the softmax denominator; per-head opt-out, total mass to KV can → 0.
+- **Attention sink** — learnable $z'_h$ in the softmax denominator; per-head opt-out, total mass to KV can → 0. (Same idea shipped earlier in **GPT-OSS**, Aug 2025.)
 - **Mixed-precision KV** — BF16 for RoPE dims, FP8 for the rest (~50% smaller). **FP4** for the indexer's Q/K.
 
 </v-clicks>
@@ -1269,7 +1258,7 @@ in production are larger; the relative shape is what matters.
 
 <div class="text-sm pt-2">
 
-- **SSM / linear hybrids** — Mamba, Mamba-2, Jamba, **Nemotron-3 Super**
+- **SSM / linear hybrids** — Mamba, Mamba-2, Jamba, **Nemotron-3 Super**, **Qwen 3.5** (3:1 **Gated DeltaNet** : full GQA, Feb 2026)
   - Replace attention, don't fix it
   - Linear-time recurrence, constant-state
   - Open Q: do the two threads converge?

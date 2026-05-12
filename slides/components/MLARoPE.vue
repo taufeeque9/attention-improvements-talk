@@ -73,7 +73,7 @@ const description = computed(() => stageMeta[stage.value].desc);
       -->
 
       <!-- =========== STAGE 0: no RoPE (absorption works) =========== -->
-      <g :opacity="isStage(0) ? 1 : 0.18" class="stage-group">
+      <g v-if="isStage(0)" class="stage-group">
         <!-- Latent c -->
         <rect x="40" y="40" width="80" height="44" rx="6" fill="#34d399" fill-opacity="0.25" stroke="#34d399"/>
         <text x="80" y="60" text-anchor="middle" class="box-label" fill="#34d399">c (latent)</text>
@@ -104,7 +104,7 @@ const description = computed(() => stageMeta[stage.value].desc);
       </g>
 
       <!-- =========== STAGE 1: naive RoPE breaks absorption =========== -->
-      <g :opacity="isStage(1) ? 1 : 0.18" class="stage-group">
+      <g v-if="isStage(1)" class="stage-group">
         <rect x="40" y="40" width="80" height="44" rx="6" fill="#34d399" fill-opacity="0.25" stroke="#34d399"/>
         <text x="80" y="60" text-anchor="middle" class="box-label" fill="#34d399">c (latent)</text>
         <text x="80" y="76" text-anchor="middle" class="dim-label" fill="#bbb">d_c</text>
@@ -139,7 +139,7 @@ const description = computed(() => stageMeta[stage.value].desc);
       </g>
 
       <!-- =========== STAGE 2: decoupled fix =========== -->
-      <g :opacity="isStage(2) ? 1 : 0.18" class="stage-group">
+      <g v-if="isStage(2)" class="stage-group">
         <!-- Latent c -->
         <rect x="20" y="20" width="70" height="40" rx="6" fill="#34d399" fill-opacity="0.25" stroke="#34d399"/>
         <text x="55" y="42" text-anchor="middle" class="box-label" fill="#34d399">c (latent)</text>
